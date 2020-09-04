@@ -1118,7 +1118,10 @@ void forEachVoxel(SparseVoxelOctree<T, SQUASH, BT> &svo, const Consumer &consume
     }
 }
 
-template <typename Reduction,
+namespace detail {
+
+template <bool EXPAND,
+          typename Reduction,
           typename T,
           size_t SQUASH,
           typename BT,
@@ -1128,7 +1131,7 @@ template <typename Reduction,
                                                  size_t,
                                                  typename SparseVoxelOctree<T, SQUASH, BT>::branch_type &>,
                            int> = 0>
-void reduceNodes(SparseVoxelOctree<T, SQUASH, BT> &svo, const Reduction &reduction)
+void reduceOrExpandNodes(SparseVoxelOctree<T, SQUASH, BT> &svo, const Reduction &reduction)
 {
     using svo_type = std::remove_reference_t<decltype(svo)>;
     using node_type = typename svo_type::node_type;
@@ -1136,7 +1139,7 @@ void reduceNodes(SparseVoxelOctree<T, SQUASH, BT> &svo, const Reduction &reducti
 
     node_type *buffer[svo_type::BRANCHING_FACTOR];
 
-    svo.forEachNodeBottomUp([&buffer, &reduction](node_type *node, SvoNodeType type) -> void {
+    const auto consumer = [&buffer, &reduction](node_type *node, SvoNodeType type) -> void {
         if (type == SvoNodeType::LEAF) {
             return;
         }
@@ -1149,7 +1152,45 @@ void reduceNodes(SparseVoxelOctree<T, SQUASH, BT> &svo, const Reduction &reducti
         }
 
         reduction(buffer, oldCount, *oldBranch);
-    });
+    };
+    if constexpr (EXPAND) {
+        svo.forEachNodeTopDown(consumer);
+    }
+    else {
+        svo.forEachNodeBottomUp(consumer);
+    }
+}
+
+}  // namespace detail
+
+template <typename Reduction,
+          typename T,
+          size_t SQUASH,
+          typename BT,
+          std::enable_if_t<std::is_invocable_r_v<void,
+                                                 Reduction,
+                                                 typename SparseVoxelOctree<T, SQUASH, BT>::node_type *[],
+                                                 size_t,
+                                                 typename SparseVoxelOctree<T, SQUASH, BT>::branch_type &>,
+                           int> = 0>
+void reduceNodes(SparseVoxelOctree<T, SQUASH, BT> &svo, const Reduction &reduction)
+{
+    return detail::reduceOrExpandNodes<false>(svo, reduction);
+}
+
+template <typename Reduction,
+          typename T,
+          size_t SQUASH,
+          typename BT,
+          std::enable_if_t<std::is_invocable_r_v<void,
+                                                 Reduction,
+                                                 typename SparseVoxelOctree<T, SQUASH, BT>::node_type *[],
+                                                 size_t,
+                                                 typename SparseVoxelOctree<T, SQUASH, BT>::branch_type &>,
+                           int> = 0>
+void expandNodes(SparseVoxelOctree<T, SQUASH, BT> &svo, const Reduction &reduction)
+{
+    return detail::reduceOrExpandNodes<true>(svo, reduction);
 }
 
 template <typename Reduction,

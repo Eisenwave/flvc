@@ -2,6 +2,7 @@
 #define SVO_NODES_HPP
 
 #include "voxelio/src/assert.hpp"
+#include "voxelio/src/bits.hpp"
 
 #include <array>
 #include <bitset>
@@ -104,7 +105,34 @@ public:
      */
     bool has(size_t index) const
     {
+        VXIO_DEBUG_ASSERT_LT(index, N);
         return mask_.test(index);
+    }
+
+    /**
+     * @brief Returns the index of the first child which exists or N if the node is empty.
+     * @return the index of the first child
+     */
+    size_t firstIndex() const
+    {
+        if constexpr (N == 8) {
+            return voxelio::countTrailingZeros(static_cast<uint8_t>(mask_.to_ullong()));
+        }
+        else if constexpr (N == 64) {
+            return voxelio::countTrailingZeros(static_cast<uint64_t>(mask_.to_ullong()));
+        }
+        else {
+            if (mask_.none()) {
+                return N;
+            }
+            size_t i = 0;
+            for (; i < N; ++i) {
+                if (mask_.test(i)) {
+                    break;
+                }
+            }
+            return i;
+        }
     }
 
     template <typename V = BT, std::enable_if_t<not std::is_void_v<V>, int> = 0>
@@ -171,16 +199,19 @@ public:
 
     child_type *child(size_t index)
     {
+        VXIO_DEBUG_ASSERT_LT(index, N);
         return children[index].get();
     }
 
     const child_type *child(size_t index) const
     {
+        VXIO_DEBUG_ASSERT_LT(index, N);
         return children[index].get();
     }
 
     uptr<child_type> extract(size_t index)
     {
+        VXIO_DEBUG_ASSERT_LT(index, N);
         VXIO_DEBUG_ASSERT(this->has(index));
         this->mask_.reset(index);
         return std::move(children[index]);
@@ -188,6 +219,7 @@ public:
 
     void insert(size_t index, uptr<child_type> node)
     {
+        VXIO_DEBUG_ASSERT_LT(index, N);
         children[index] = std::move(node);
         this->mask_.set(index);
     }
@@ -233,12 +265,14 @@ public:
     // custom methods
     const T &at(size_t index) const
     {
+        VXIO_DEBUG_ASSERT_LT(index, N);
         VXIO_DEBUG_ASSERT(this->has(index));
         return data[index];
     }
 
     T &at(size_t index)
     {
+        VXIO_DEBUG_ASSERT_LT(index, N);
         VXIO_DEBUG_ASSERT(this->has(index));
         return data[index];
     }

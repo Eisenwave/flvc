@@ -1,11 +1,16 @@
-#ifndef FLVC_HPP
-#define FLVC_HPP
+#ifndef FLVC_CODEC_HPP
+#define FLVC_CODEC_HPP
 
+// this file is presently shared between the FLVC project and MVE via a hardlink
+// (I know, that is such a filthy practice, it will be fixed soon)
 #ifdef MVE_MAJOR
 #include "core_structs/svo.hpp"
 #else
 #include "svo.hpp"
 #endif
+
+#include "flvcconst.hpp"
+#include "permutation.hpp"
 
 #include "voxelio/src/deflate.hpp"
 #include "voxelio/src/endian.hpp"
@@ -16,182 +21,6 @@
 #include <vector>
 
 namespace flvc {
-
-// CONFIG ==============================================================================================================
-
-// This flag can help with manual debugging of the output data in a hex editor.
-// NEVER push this with a true value.
-constexpr bool ANNOTATE_BINARY = false;
-
-// ENUMS & CONSTANTS ===================================================================================================
-
-enum class AttributeType : uint8_t {
-    // clang-format off
-    /// 8-bit unsigned integer where any nonzero value is interpreted as true
-    BOOL     = 0x01,
-
-    /// 8-bit signed integer
-    INT_8    = 0x11,
-    /// 16-bit signed integer
-    INT_16   = 0x12,
-    /// 32-bit signed integer
-    INT_32   = 0x14,
-    /// 64-bit signed integer
-    INT_64   = 0x18,
-
-    /// 8-bit unsigned integer
-    UINT_8   = 0x21,
-    /// 16-bit unsigned integer
-    UINT_16  = 0x22,
-    /// 32-bit unsigned integer
-    UINT_32  = 0x24,
-    /// 64-bit unsigned integer
-    UINT_64  = 0x28,
-
-    /// 32-bit floating point
-    FLOAT_32 = 0x34,
-    /// 64-bit floating point
-    FLOAT_64 = 0x38,
-
-    /// Q.8 fixed point number where raw ~0 is interpreted as 1.
-    // UFRAC_8   = 0x41,
-    /// Q.16 fixed point number where raw ~0 is interpreted as 1.
-    // UFRAC_16  = 0x42,
-    /// Q.32 fixed point number where raw ~0 is interpreted as 1.
-    // UFRAC_32  = 0x44,
-    /// Q.64 fixed point number where raw ~0 is interpreted as 1.
-    // UFRAC_64  = 0x48
-    // clang-format on
-};
-
-constexpr bool isValid(AttributeType type)
-{
-    auto rawType = static_cast<uint8_t>(type);
-    return type == AttributeType::BOOL || (rawType >= 0x10 && rawType <= 0x38 && voxelio::isPow2(rawType & 0xfu));
-}
-
-static_assert(isValid(AttributeType::BOOL));
-static_assert(isValid(AttributeType::UINT_64));
-static_assert(isValid(AttributeType::FLOAT_64));
-static_assert(not isValid(AttributeType{0x39}));
-static_assert(not isValid(AttributeType{2}));
-static_assert(not isValid(AttributeType{0x10}));
-
-/**
- * @brief Returns the size of an attribute type in bytes.
- * @param type the type
- * @return the size of the type in bytes
- */
-constexpr size_t sizeOf(AttributeType type)
-{
-    return static_cast<size_t>(type) & 0xf;
-}
-
-/// Returns true if the type is an integer. BOOL is also treated as an integer.
-constexpr bool isInteger(AttributeType type)
-{
-    return static_cast<uint8_t>(type) < static_cast<uint8_t>(AttributeType::FLOAT_32);
-}
-
-/// Returns true if the type is signed. (signed integers, floats, ...)
-constexpr bool isSigned(AttributeType type)
-{
-    return (static_cast<uint8_t>(type) & 0x10) != 0;
-}
-
-/// Returns true if the type is unsigned. (unsigned integers, bool, unsigned fractions, ...)
-constexpr bool isUnsigned(AttributeType type)
-{
-    return (static_cast<uint8_t>(type) & 0x10) == 0;
-}
-
-/// Returns true if the type is a floating point type.
-constexpr bool isFloat(AttributeType type)
-{
-    return static_cast<uint8_t>(type) >= static_cast<uint8_t>(AttributeType::FLOAT_32);
-}
-
-enum class ResultCode : uint8_t {
-    /// Operation was performed successfully.
-    OK,
-    /// An attempt was made to define an attribute which has already been defined.
-    MULTIPLE_DEFINITIONS,
-    /// Voxels were inserted before defining at least a position attribute.
-    INSERT_BEFORE_DEFINE,
-    /// Voxels were inserted after already writing the SVO.
-    INSERT_AFTER_WRITE,
-    /// The SVO was written before defining at least a position attribute.
-    WRITE_BEFORE_DEFINE,
-    /// An attribute was defined after inserting attribute data.
-    DEFINE_AFTER_INSERT,
-    /// An attribute was defined after writing the SVO.
-    DEFINE_AFTER_WRITE,
-    /// Voxel data was read before the position attribute was extracted from the header.
-    READ_BEFORE_DEFINE,
-    /// An I/O error occured when writing the SVO.
-    IO_ERROR,
-    /// Unexpected EOF reached.
-    EOF_ERROR,
-    /// The encoder was used after entering a failed state (due to I/O error).
-    USE_AFTER_FAIL,
-    /// An identifier was given to an attribute which is longer than 255 characters and can't be stored.
-    IDENTIFIER_TOO_LONG,
-    /// Magic bytes don't match when reading.
-    MAGIC_MISMATCH,
-    /// The read version is not supported.
-    VERSION_UNSUPPORTED,
-    /// The read header has no attributes.
-    HEADER_MISSING_ATTRIBUTES,
-    /// The read header does not define a position attribute
-    HEADER_MISSING_POSITION_ATTRIBUTE,
-    /// A bool was read which is outside the range [0, 1].
-    CORRUPTED_BOOL,
-    /// An enum was read which is not a named constant.
-    CORRUPTED_ENUM,
-    /// The encoded SVO is deeper than expected.
-    SVO_TOO_DEEP,
-    /// The frame stack was popped without any node on it.
-    EMPTY_STACK_POP,
-    /// Invalid dimensions were read. For FLVC, this means that one dimension was zero while the others weren't.
-    DEGENERATE_DIMENSIONS,
-    /// The dimensions of the SVO are zero, but the empty flag is not set.
-    EMPTYNESS_CONTRADICTION,
-    /// A reserved value had an unexpected value.
-    RESERVED_MISMATCH
-};
-
-constexpr const char *nameOf(ResultCode code)
-{
-#define ENUM_CASE(e) \
-    case ResultCode::e: return #e
-    switch (code) {
-        ENUM_CASE(OK);
-        ENUM_CASE(MULTIPLE_DEFINITIONS);
-        ENUM_CASE(HEADER_MISSING_ATTRIBUTES);
-        ENUM_CASE(HEADER_MISSING_POSITION_ATTRIBUTE);
-        ENUM_CASE(INSERT_BEFORE_DEFINE);
-        ENUM_CASE(INSERT_AFTER_WRITE);
-        ENUM_CASE(WRITE_BEFORE_DEFINE);
-        ENUM_CASE(DEFINE_AFTER_INSERT);
-        ENUM_CASE(DEFINE_AFTER_WRITE);
-        ENUM_CASE(IO_ERROR);
-        ENUM_CASE(EOF_ERROR);
-        ENUM_CASE(USE_AFTER_FAIL);
-        ENUM_CASE(IDENTIFIER_TOO_LONG);
-        ENUM_CASE(MAGIC_MISMATCH);
-        ENUM_CASE(VERSION_UNSUPPORTED);
-        ENUM_CASE(CORRUPTED_BOOL);
-        ENUM_CASE(CORRUPTED_ENUM);
-        ENUM_CASE(READ_BEFORE_DEFINE);
-        ENUM_CASE(EMPTY_STACK_POP);
-        ENUM_CASE(SVO_TOO_DEEP);
-        ENUM_CASE(DEGENERATE_DIMENSIONS);
-        ENUM_CASE(EMPTYNESS_CONTRADICTION);
-        ENUM_CASE(RESERVED_MISMATCH);
-    }
-    VXIO_DEBUG_ASSERT_UNREACHABLE();
-#undef ENUM_CASE
-}
 
 // ATTRIBUTE DEFINITIONS ===============================================================================================
 
@@ -241,15 +70,43 @@ struct AttributeDef {
     }
 };
 
+/// Extends an attribute definition by additional internally used members.
+struct ExtendedAttributeDef : public AttributeDef {
+    size_t inputOffset;
+};
+
+// DELTA KERNEL ========================================================================================================
+
+struct DeltaKernel {
+    static constexpr size_t CAPACITY = 8;
+
+    uint8_t *children[CAPACITY]{};
+    uint8_t *parent = nullptr;
+    size_t size = 0;
+
+    void pushChild(uint8_t *data)
+    {
+        VXIO_DEBUG_ASSERT_LT(size, CAPACITY);
+        children[size++] = data;
+    }
+
+    void encode(const ExtendedAttributeDef defs[], size_t count, size_t posAttrib);
+    void decode(const ExtendedAttributeDef defs[], size_t count, size_t posAttrib);
+
+    void reset(uint8_t *parent)
+    {
+        this->parent = parent;
+        size = 0;
+    }
+};
+
 // BASE ================================================================================================================
 
 class CodecBase {
-protected:
-    /// Extends an attribute definition by additional internally used members.
-    struct InternalAttributeDef : public AttributeDef {
-        size_t inputOffset;
-    };
+public:
+    using attrib_range_t = std::vector<ExtendedAttributeDef>;
 
+protected:
     /// Type of encoded node. Can be either leaf, branch or voxel.
     enum class NodeType : signed char {
         LEAF = 0,
@@ -317,8 +174,15 @@ protected:
     size_t encodedAttribSize = 1;
     size_t positionAttribIndex = 0;
 
-    std::vector<InternalAttributeDef> attribDefs;
+    attrib_range_t attribDefs;
     std::vector<uint8_t> attribData;
+
+    Permutation ileavePermsWithInternal[8]{};
+    Permutation ileavePermsNoInternal[8]{};
+    Permutation dileavePermsWithInternal[8]{};
+    Permutation dileavePermsNoInternal[8]{};
+
+    DeltaKernel deltaKernel;
 
     CodecBase(Mode mode) noexcept : mode{mode} {}
 
@@ -341,11 +205,21 @@ public:
      * @brief Returns the current definition of the position attribute.
      * @return
      */
-    const InternalAttributeDef &positionDefinition() const noexcept
+    const ExtendedAttributeDef &positionDefinition() const noexcept
     {
         VXIO_DEBUG_ASSERT_NE(attribDefs.size(), 0);
         VXIO_DEBUG_ASSERT_GE(state, STATE_POSITION_ATTRIBUTE_DEFINED);
         return attribDefs[positionAttribIndex];
+    }
+
+    /**
+     * @brief Returns a reference to a constant range which which iterates over the AttributeDef objects stored
+     * by the encoder/decoder.
+     * @return the range of attribute definitions
+     */
+    const attrib_range_t &attributeRange() const
+    {
+        return attribDefs;
     }
 
 protected:
@@ -365,11 +239,39 @@ protected:
         }
     }
 
+    /**
+     * @brief Generates (de-)interleaving permutations for every possible amount of child nodes.
+     * This fills the ileavePermsWithInternal & co. arrays completely.
+     */
+    void genPermutations() noexcept;
+
     [[nodiscard]] size_t allocAttribute() noexcept;
+
+    /**
+     * @brief Inserts decoded attribute data (so still including the position data) into the attribute data vector.
+     * This will crop out the position attribute and also insert one internal byte used for masks.
+     * @param attributeData the input data in decoded format
+     * @return the base index of the inserted data (aka. the size of the vector before insertion)
+     */
     [[nodiscard]] size_t insertAttribute(const uint8_t attributeData[]) noexcept;
 
     [[nodiscard]] voxelio::Vec3i32 decodePosition(const uint8_t attributeData[]) noexcept;
     size_t encodePosition(voxelio::Vec3i32 pos, uint8_t attributeData[]) noexcept;
+
+private:
+    /**
+     * @brief Generates the (de-)interleaving permutations for a given node count.
+     * This fills the ileavePermsWithInternal & co. buffers at a single index.
+     *
+     * @param nodeCount the number of nodes to generate the permutation for; in range [1, 8]
+     */
+    void genPermutations(size_t nodeCount) noexcept;
+
+    /**
+     * @brief Generates a de-interleaving permutation for a given node count.
+     * @param nodeCount the number of nodes to generate the permutation for
+     */
+    flvc::Permutation genDeinterleavingPermutation(size_t nodeCount) noexcept;
 };
 
 struct Header {
@@ -392,6 +294,13 @@ struct Header {
 
 // ENCODER =============================================================================================================
 
+/**
+ * @brief The FLVC encoder.
+ * Allows for insertion of voxel data which is then written all at once using write().
+ *
+ * All data except for the header is compressed using zlib.
+ * Compression settings can be provided in the constructor.
+ */
 class Encoder : public CodecBase {
 private:
     using svo_type = mve::SparseVoxelOctree<size_t, 0, size_t>;
@@ -429,16 +338,45 @@ public:
     [[nodiscard]] ResultCode write();
 
 private:
+    /**
+     * @brief Writes the header to the stream.
+     * This requires a position attribute to be defined.
+     * @return true if writing was successful
+     */
     bool writeHeader();
-    void optimizeSvo();
+    /**
+     * @brief Writes the (deflated) SVO.
+     * @return true if writing was successful
+     */
     bool writeSvo();
 
+    /**
+     * @brief Performs various optimizations of the SVO.
+     * Most notably, geometry of completely filled branches is trimmed and attributes are expressed as deltas to
+     * their parents.
+     */
+    void optimizeSvo();
+    void optimizeSvo_initAttribData(node_type *children[], size_t count, branch_type &parent);
+    void optimizeSvo_initAttribDataForOneNode(node_type &node, SvoNodeType type);
+    void optimizeSvo_reduceCompleteMasks(node_type *children[], size_t count, branch_type &parent);
+    void optimizeSvo_computeAttributeDeltas(node_type *children[], size_t count, branch_type &parent);
+
+    /**
+     * @brief Writes the attribute data of one node.
+     * @param attribIndex the attribute index
+     * @param type the type of the node
+     * @return true if writing was successful
+     */
     bool writeAttribData(size_t attribIndex, NodeType type);
+
     bool writeNode(node_type &node, SvoNodeType type);
 };
 
 // DECODER =============================================================================================================
 
+/**
+ * @brief The FLVC decoder.
+ */
 class Decoder : public CodecBase {
 private:
     using index_t = uint32_t;
@@ -519,12 +457,21 @@ public:
      */
     [[nodiscard]] ResultCode readVoxels(uint8_t out[], size_t bufferSize, size_t &outVoxelsRead);
 
-    bool eof()
+    /**
+     * @brief Returns true if the decoder is done or failed.
+     * This does not have to be caused by a stream reaching the EOF, but rather by reading the last byte which is part
+     * of the SVO.
+     * @return true if the decoder is done or failed
+     */
+    bool done()
     {
         return state >= STATE_IO_DONE;
     }
 
 private:
+    [[nodiscard]] ResultCode readHeader_constants() noexcept;
+    [[nodiscard]] ResultCode readHeader_attributeDefinitions() noexcept;
+
     void decodeVoxelData(const uint8_t in[], uint8_t out[]) noexcept;
 
     /**
@@ -537,8 +484,28 @@ private:
      */
     [[nodiscard]] ResultCode readFrameAttributes(Frame &frame, uint8_t parentMask) noexcept;
 
+    /**
+     * @brief De-optimizes the top frame. Called right after reading frame attributes.
+     * This method reverses all optimizations applied during encoding.
+     *
+     * The size of the frame is not changed by this operation, but attributes are de-interleaved, bit-de-interleaved,
+     * converted from deltas to absolute values etc.
+     *
+     * @param parentMask the parent mask
+     */
+    void deoptimizeFrame(Frame &frame, uint8_t parentMask, uint8_t childCount, bool noGeometry) noexcept;
+
+    void deoptimizeFrame_bitDeinterleave(Frame &frame, uint8_t childCount, bool noGeometry) noexcept;
+    void deoptimizeFrame_byteInterleave(Frame &frame, uint8_t childCount, bool noGeometry) noexcept;
+    void deoptimizeFrame_decodeDeltas(Frame &frame, uint8_t parentMask, bool noGeometry) noexcept;
+
     // FRAME AND POSITION MANAGEMENT ===================================================================================
 
+    /**
+     * @brief Returns the current voxel position.
+     * This result is only meaningful after navigating to a voxel (e.g. using goToNextVoxel()).
+     * @return the current 3D position
+     */
     voxelio::Vec3i32 position() noexcept;
 
     /**
