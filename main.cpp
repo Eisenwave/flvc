@@ -6,7 +6,8 @@
 #include "log.hpp"
 #include "stringmanip.hpp"
 #include "voxelio.hpp"
-#include "flvc.hpp"
+
+#include "flvccodec.hpp"
 
 #include "format/binvox.hpp"
 #include "format/cubeworld.hpp"

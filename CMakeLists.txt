@@ -15,7 +15,16 @@ endif()
 add_subdirectory(voxelio)
 include_directories(voxelio/src)
 
-set(SOURCES main.cpp flvc.hpp flvc.cpp svo.hpp svo_nodes.hpp)
+set(SOURCES
+    main.cpp
+    flvcattrib.hpp
+    flvccodec.hpp
+    flvccodec.cpp
+    flvcconfig.hpp
+    flvcconst.hpp
+    permutation.hpp
+    svo.hpp
+    svo_nodes.hpp)
 
 add_executable(flvc "${SOURCES}")
 target_include_directories(flvc PUBLIC voxelio/src/)
