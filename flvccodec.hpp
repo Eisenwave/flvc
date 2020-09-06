@@ -468,6 +468,11 @@ public:
         return state >= STATE_IO_DONE;
     }
 
+    bool failed()
+    {
+        return state == STATE_FAILED;
+    }
+
 private:
     [[nodiscard]] ResultCode readHeader_constants() noexcept;
     [[nodiscard]] ResultCode readHeader_attributeDefinitions() noexcept;

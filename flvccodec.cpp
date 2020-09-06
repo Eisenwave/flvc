@@ -1160,6 +1160,7 @@ ResultCode Decoder::goToNextVoxel(bool &outEof) noexcept
         }
     } while (depth <= header.svoDepth);
 
+    outEof = false;
     return ResultCode::OK;
 }
 

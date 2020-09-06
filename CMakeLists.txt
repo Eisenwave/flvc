@@ -4,11 +4,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 project(flvc)
 
-if(CMAKE_BUILD_TYPE STREQUAL Debug)
-    message("Building voxel-io DEBUG")
+string(TOUPPER "${CMAKE_BUILD_TYPE}" build_type)
+
+if(build_type STREQUAL DEBUG)
+    message("Building FLVC DEBUG")
     add_definitions(-DVXIO_DEBUG)
+elseif(build_type STREQUAL RELWITHDEBINFO)
+    message("Building FLVC RELEASE (with debug info)")
+    add_definitions(-DVXIO_RELEASE)
 else()
-    message("Building voxel-io RELEASE")
+    message("Building FLVC RELEASE")
     add_definitions(-DVXIO_RELEASE)
 endif()
 
