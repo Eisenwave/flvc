@@ -15,7 +15,7 @@
 
 namespace flvc {
 
-// STATIC UTILITY ======================================================================================================
+// COMMON UTILITY ======================================================================================================
 
 namespace detail {
 
@@ -50,6 +50,16 @@ constexpr voxelio::Vec3u32 dileave3_one(uint64_t n)
     return voxelio::Vec3u64{(n >> 2) & 1, (n >> 1) & 1, (n >> 0) & 1}.cast<uint32_t>();
 }
 
+/// A container type which is empty when T is void and otherwise stores the type.
+template <typename T>
+struct Voidable {
+    T value;
+};
+
+template <>
+struct Voidable<void> {
+};
+
 }  // namespace detail
 
 // ENUMS ===============================================================================================================
@@ -69,19 +79,6 @@ constexpr const char *nameOf(SvoNodeType type)
 
 // NODE CLASSES ========================================================================================================
 
-namespace detail {
-
-template <typename T>
-struct Voidable {
-    T value;
-};
-
-template <>
-struct Voidable<void> {
-};
-
-}  // namespace detail
-
 template <typename BT = void>
 class SvoNode {
 private:
@@ -99,10 +96,10 @@ public:
     virtual ~SvoNode() = default;
 
     SvoNode(SvoNode &&) = default;
-    SvoNode(const SvoNode &) = default;
+    SvoNode(const SvoNode &) = delete;
 
     SvoNode &operator=(SvoNode &&) = default;
-    SvoNode &operator=(const SvoNode &) = default;
+    SvoNode &operator=(const SvoNode &) = delete;
 
     const std::bitset<N> &mask() const
     {
@@ -177,24 +174,8 @@ public:
         return val.value;
     }
 
-    /**
-     * Clones this node virtually. The result is an unmanaged pointer on the heap.
-     * @return a pointer to the cloned object
-     */
-    virtual SvoNode *clone() const = 0;
-
     virtual SvoNodeType type() const = 0;
 };
-
-template <typename BT>
-std::array<std::unique_ptr<SvoNode<BT>>, 8> deepCopy(const std::array<std::unique_ptr<SvoNode<BT>>, 8> &copyOf)
-{
-    std::array<std::unique_ptr<SvoNode<BT>>, 8> result;
-    for (size_t i = 0; i < 8; ++i) {
-        result[i] = std::unique_ptr<SvoNode<BT>>(copyOf[i]->clone());
-    }
-    return result;
-}
 
 template <typename BT = void>
 class SvoBranch : public SvoNode<BT> {
@@ -216,14 +197,9 @@ protected:
 
 public:
     SvoBranch() = default;
-    SvoBranch(const SvoBranch &copyOf) : SvoNode<BT>{copyOf}, children{deepCopy(copyOf.children)} {}
+    SvoBranch(const SvoBranch &copyOf) = delete;
     SvoBranch(SvoBranch &&moveOf) = default;
     ~SvoBranch() final = default;
-
-    SvoBranch *clone() const final
-    {
-        return new SvoBranch{*this};
-    }
 
     SvoNodeType type() const final
     {
@@ -257,14 +233,8 @@ public:
         this->mask_.set(index);
     }
 
-    SvoBranch &operator=(const SvoBranch &copyOf)
-    {
-        children = deepCopy(copyOf.children);
-        this->mask_ = copyOf.mask_;
-        return *this;
-    }
-
     SvoBranch &operator=(SvoBranch &&moveOf) = default;
+    SvoBranch &operator=(const SvoBranch &moveOf) = delete;
 };
 
 template <typename T, typename BT = void>
@@ -282,15 +252,10 @@ public:
     ~SvoLeaf() final = default;
 
     SvoLeaf(SvoLeaf &&) = default;
-    SvoLeaf(const SvoLeaf &) = default;
+    SvoLeaf(const SvoLeaf &) = delete;
 
     SvoLeaf &operator=(SvoLeaf &&) = default;
-    SvoLeaf &operator=(const SvoLeaf &) = default;
-
-    SvoLeaf *clone() const final
-    {
-        return new SvoLeaf{*this};
-    }
+    SvoLeaf &operator=(const SvoLeaf &) = delete;
 
     SvoNodeType type() const final
     {
@@ -584,13 +549,7 @@ public:
         return *root;
     }
 
-    SparseVoxelOctree &operator=(const SparseVoxelOctree &copyOf)
-    {
-        root.reset(copyOf.root->clone());
-        depth = copyOf.depth;
-        return *this;
-    }
-
+    SparseVoxelOctree &operator=(const SparseVoxelOctree &copyOf) = delete;
     SparseVoxelOctree &operator=(SparseVoxelOctree &&) = default;
 
     value_type &operator[](const Vec3i32 &pos)
