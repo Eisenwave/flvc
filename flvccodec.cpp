@@ -564,14 +564,10 @@ bool Encoder::writeSvo()
     usize rootAttribIndex = svo.rootNode().value();
     writeAttribData(rootAttribIndex, NodeType::BRANCH);
 
-    const auto end = svo.depthFirstNodeRange().end();
-
-    for (auto iter = svo.depthFirstNodeRange().begin(); iter != end; ++iter) {
-        node_type *node = iter.node();
-        if (not writeNode(*node, iter.nodeType())) {
-            return false;
-        }
-    }
+    bool writeSuccess = true;
+    svo.forEachNodeTopDown([this, &writeSuccess](node_type *node, SvoNodeType type) -> void {
+        writeSuccess &= writeSuccess && writeNode(*node, type);
+    });
 
     if constexpr (ANNOTATE_BINARY) {
         return stream.good();

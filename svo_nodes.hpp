@@ -9,7 +9,7 @@
 #include <cstddef>
 #include <memory>
 
-namespace mve {
+namespace flvc {
 
 /// The type of a SparseVoxelOctree node.
 enum class SvoNodeType {
@@ -37,9 +37,11 @@ struct Voidable<void> {
 
 }  // namespace detail
 
-template <size_t N, typename BT = void>
+template <typename BT = void>
 class SvoNode {
 private:
+    static constexpr size_t N = 8;
+
     detail::Voidable<BT> val;
 
 protected:
@@ -115,24 +117,7 @@ public:
      */
     size_t firstIndex() const
     {
-        if constexpr (N == 8) {
-            return voxelio::countTrailingZeros(static_cast<uint8_t>(mask_.to_ullong()));
-        }
-        else if constexpr (N == 64) {
-            return voxelio::countTrailingZeros(static_cast<uint64_t>(mask_.to_ullong()));
-        }
-        else {
-            if (mask_.none()) {
-                return N;
-            }
-            size_t i = 0;
-            for (; i < N; ++i) {
-                if (mask_.test(i)) {
-                    break;
-                }
-            }
-            return i;
-        }
+        return voxelio::countTrailingZeros(static_cast<uint8_t>(mask_.to_ullong()));
     }
 
     template <typename V = BT, std::enable_if_t<not std::is_void_v<V>, int> = 0>
@@ -156,21 +141,24 @@ public:
     virtual SvoNodeType type() const = 0;
 };
 
-template <size_t N, typename BT>
-std::array<std::unique_ptr<SvoNode<N, BT>>, N> deepCopy(const std::array<std::unique_ptr<SvoNode<N, BT>>, N> &copyOf)
+template <typename BT>
+std::array<std::unique_ptr<SvoNode<BT>>, 8> deepCopy(const std::array<std::unique_ptr<SvoNode<BT>>, 8> &copyOf)
 {
-    std::array<std::unique_ptr<SvoNode<N, BT>>, N> result;
-    for (size_t i = 0; i < N; ++i) {
-        result[i] = std::unique_ptr<SvoNode<N, BT>>(copyOf[i]->clone());
+    std::array<std::unique_ptr<SvoNode<BT>>, 8> result;
+    for (size_t i = 0; i < 8; ++i) {
+        result[i] = std::unique_ptr<SvoNode<BT>>(copyOf[i]->clone());
     }
     return result;
 }
 
-template <size_t N, typename BT = void>
-class SvoBranch : public SvoNode<N, BT> {
+template <typename BT = void>
+class SvoBranch : public SvoNode<BT> {
+private:
+    static constexpr size_t N = 8;
+
 public:
-    using self_type = SvoBranch<N, BT>;
-    using child_type = SvoNode<N, BT>;
+    using self_type = SvoBranch<BT>;
+    using child_type = SvoNode<BT>;
 
 private:
     template <typename T>
@@ -183,7 +171,7 @@ protected:
 
 public:
     SvoBranch() = default;
-    SvoBranch(const SvoBranch &copyOf) : SvoNode<N, BT>{copyOf}, children{deepCopy(copyOf.children)} {}
+    SvoBranch(const SvoBranch &copyOf) : SvoNode<BT>{copyOf}, children{deepCopy(copyOf.children)} {}
     SvoBranch(SvoBranch &&moveOf) = default;
     ~SvoBranch() final = default;
 
@@ -234,9 +222,11 @@ public:
     SvoBranch &operator=(SvoBranch &&moveOf) = default;
 };
 
-template <typename T, size_t N, typename BT = void>
-class SvoLeaf : public SvoNode<N, BT> {
+template <typename T, typename BT = void>
+class SvoLeaf : public SvoNode<BT> {
 private:
+    static constexpr size_t N = 8;
+
     std::array<T, N> data{};
 
 protected:
@@ -294,20 +284,20 @@ public:
     }
 };
 
-template <size_t N, typename BT>
-void SvoBranch<N, BT>::doClear()
+template <typename BT>
+void SvoBranch<BT>::doClear()
 {
     for (auto &child : children) {
         child.release();
     }
 }
 
-template <typename T, size_t N, typename BT>
-void SvoLeaf<T, N, BT>::doClear()
+template <typename T, typename BT>
+void SvoLeaf<T, BT>::doClear()
 {
     // TODO destroy elements
 }
 
-}  // namespace mve
+}  // namespace flvc
 
 #endif  // SVO_NODES_HPP

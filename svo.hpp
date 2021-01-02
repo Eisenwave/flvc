@@ -1,5 +1,5 @@
-#ifndef SVO_HPP
-#define SVO_HPP
+#ifndef FLVC_SVO_HPP
+#define FLVC_SVO_HPP
 
 #include "svo_nodes.hpp"
 
@@ -10,7 +10,7 @@
 #include <stack>
 #include <vector>
 
-namespace mve {
+namespace flvc {
 
 namespace detail {
 
@@ -45,33 +45,9 @@ constexpr voxelio::Vec3u32 dileave3_one(uint64_t n)
     return voxelio::Vec3u64{(n >> 2) & 1, (n >> 1) & 1, (n >> 0) & 1}.cast<uint32_t>();
 }
 
-/// Interleaves three two-bit numbers.
-constexpr uint64_t ileave3_two(uint32_t x, uint32_t y, uint32_t z)
-{
-    uint64_t hi = ((x & 2) << 2) | ((y & 2) << 1) | ((z & 2) << 0);
-    uint64_t lo = ((x & 1) << 2) | ((y & 1) << 1) | ((z & 1) << 0);
-    // normally we would need to shift hi by 3 bits but all bits are already shifted because of their
-    // position within each coordinate
-    return (hi << 2) | lo;
-}
-
-/// Deinterleaves three two-bit numbers.
-constexpr voxelio::Vec3u32 dileave3_two(uint64_t n)
-{
-    uint32_t hi = static_cast<uint32_t>(n >> 3) & 0b111;
-    uint32_t lo = static_cast<uint32_t>(n >> 0) & 0b111;
-    uint32_t x = ((hi & 4) >> 1) | ((lo & 4) >> 2);
-    uint32_t y = ((hi & 2) >> 0) | ((lo & 2) >> 1);
-    uint32_t z = ((hi & 1) << 1) | ((lo & 1) >> 0);
-    return {x, y, z};
-}
-
 }  // namespace detail
 
-template <typename TSparseVoxelOctree>
-class depth_first_range_impl;
-
-template <typename T, size_t SQUASH = 0, typename BT = void>
+template <typename T, typename BT = void>
 class SparseVoxelOctree {
 private:
     using i32 = int32_t;
@@ -97,15 +73,8 @@ private:
      */
     static constexpr u32 unilateralCapacity(size_t depth)
     {
-        // this effectively calculates:
-        // pow(2, d * (squashes + 1) + squashes)
-        //
-        // for no squash, this calculates:
-        // pow(2, d)
-        //
-        // for one squash, this calculates:
-        // pow(4, d) * 2
-        return 1 << (depth * (SQUASHES + 1) + SQUASHES);
+        // this effectively calculates pow(2, d)
+        return 1 << depth;
     }
 
 public:
@@ -114,13 +83,9 @@ public:
     /// An inclusive lower bound for coordinates.
     static constexpr i32 COORDINATE_LOWER_LIMIT = -COORDINATE_UPPER_LIMIT;
     /// The amount of bits that one octree node index digit has.
-    static constexpr size_t INDEX_DIGIT_BITS = 3 * (SQUASH + 1);
+    static constexpr size_t INDEX_DIGIT_BITS = 3;
     /// A mask for a single octree node index digit.
-    static constexpr size_t INDEX_DIGIT_MASK = (1 << INDEX_DIGIT_BITS) - 1;
-    /// The size of a node in all directions. Also equal to cbrt(BRANCHING_FACTOR).
-    static constexpr size_t UNILATERAL_NODE_SIZE = 1 << (SQUASH + 1);
-    /// The number of SVO layer squashes. Zero for regular SVO with 8 branches.
-    static constexpr size_t SQUASHES = SQUASH;
+    static constexpr size_t INDEX_DIGIT_MASK = 0b111;
     /// The branching factor. 8 for an unsquashed SVO, 64 for one squash, etc.
     static constexpr size_t BRANCHING_FACTOR = 1 << INDEX_DIGIT_BITS;
 
@@ -129,22 +94,9 @@ public:
     using value_type = T;
     using branch_value_type = BT;
 
-    using node_type = SvoNode<BRANCHING_FACTOR, branch_value_type>;
-    using branch_type = SvoBranch<BRANCHING_FACTOR, branch_value_type>;
-    using leaf_type = SvoLeaf<T, BRANCHING_FACTOR, branch_value_type>;
-
-    using depth_first_range = depth_first_range_impl<SparseVoxelOctree>;
-    using const_depth_first_range = depth_first_range_impl<const SparseVoxelOctree>;
-
-    depth_first_range depthFirstNodeRange()
-    {
-        return {this};
-    }
-
-    const_depth_first_range depthFirstNodeRange() const
-    {
-        return {this};
-    }
+    using node_type = SvoNode<branch_value_type>;
+    using branch_type = SvoBranch<branch_value_type>;
+    using leaf_type = SvoLeaf<T, branch_value_type>;
 
 private:
     template <typename Consumer>
@@ -428,8 +380,8 @@ private:
 
 // VOXEL INSERTION/ACCESS/SEARCH =======================================================================================
 
-template <typename T, size_t SQUASH, typename BT>
-T &SparseVoxelOctree<T, SQUASH, BT>::findValueOrCreate_unsafe(u64 octreeNodeIndex)
+template <typename T, typename BT>
+T &SparseVoxelOctree<T, BT>::findValueOrCreate_unsafe(u64 octreeNodeIndex)
 {
     node_type *node = root.get();
     for (size_t s = depth * INDEX_DIGIT_BITS; s != size_t(-INDEX_DIGIT_BITS); s -= INDEX_DIGIT_BITS) {
@@ -454,8 +406,8 @@ T &SparseVoxelOctree<T, SQUASH, BT>::findValueOrCreate_unsafe(u64 octreeNodeInde
     VXIO_DEBUG_ASSERT_UNREACHABLE();
 }
 
-template <typename T, size_t SQUASH, typename BranchT>
-typename SparseVoxelOctree<T, SQUASH, BranchT>::node_type *SparseVoxelOctree<T, SQUASH, BranchT>::findNode_unsafe_impl(
+template <typename T, typename BranchT>
+typename SparseVoxelOctree<T, BranchT>::node_type *SparseVoxelOctree<T, BranchT>::findNode_unsafe_impl(
     u64 octreeNodeIndex) const
 {
     node_type *node = root.get();
@@ -476,8 +428,8 @@ typename SparseVoxelOctree<T, SQUASH, BranchT>::node_type *SparseVoxelOctree<T, 
     VXIO_DEBUG_ASSERT_UNREACHABLE();
 }
 
-template <typename T, size_t SQUASH, typename BranchT>
-T *SparseVoxelOctree<T, SQUASH, BranchT>::findIfExists_unsafe_impl(u64 octreeNodeIndex) const
+template <typename T, typename BranchT>
+T *SparseVoxelOctree<T, BranchT>::findIfExists_unsafe_impl(u64 octreeNodeIndex) const
 {
     node_type *node = root.get();
     for (size_t s = depth * INDEX_DIGIT_BITS; s != size_t(-INDEX_DIGIT_BITS); s -= INDEX_DIGIT_BITS) {
@@ -499,8 +451,8 @@ T *SparseVoxelOctree<T, SQUASH, BranchT>::findIfExists_unsafe_impl(u64 octreeNod
     VXIO_DEBUG_ASSERT_UNREACHABLE();
 }
 
-template <typename T, size_t SQUASH, typename BranchT>
-T *SparseVoxelOctree<T, SQUASH, BranchT>::getIfExists(const Vec3i32 &pos)
+template <typename T, typename BranchT>
+T *SparseVoxelOctree<T, BranchT>::getIfExists(const Vec3i32 &pos)
 {
     if (u32 lim = boundsTest(pos); lim != 0) {
         return nullptr;
@@ -508,8 +460,8 @@ T *SparseVoxelOctree<T, SQUASH, BranchT>::getIfExists(const Vec3i32 &pos)
     return findValue_unsafe(indexOf(pos));
 }
 
-template <typename T, size_t SQUASH, typename BranchT>
-const T *SparseVoxelOctree<T, SQUASH, BranchT>::getIfExists(const Vec3i32 &pos) const
+template <typename T, typename BranchT>
+const T *SparseVoxelOctree<T, BranchT>::getIfExists(const Vec3i32 &pos) const
 {
     if (u32 lim = boundsTest(pos); lim != 0) {
         return nullptr;
@@ -517,24 +469,24 @@ const T *SparseVoxelOctree<T, SQUASH, BranchT>::getIfExists(const Vec3i32 &pos) 
     return findValue_unsafe(indexOf(pos));
 }
 
-template <typename T, size_t SQUASH, typename BranchT>
-T &SparseVoxelOctree<T, SQUASH, BranchT>::at(const Vec3i32 &pos)
+template <typename T, typename BranchT>
+T &SparseVoxelOctree<T, BranchT>::at(const Vec3i32 &pos)
 {
     auto *result = getIfExists(pos);
     VXIO_ASSERT_NOTNULL(result);
     return *result;
 }
 
-template <typename T, size_t SQUASH, typename BranchT>
-const T &SparseVoxelOctree<T, SQUASH, BranchT>::at(const Vec3i32 &pos) const
+template <typename T, typename BranchT>
+const T &SparseVoxelOctree<T, BranchT>::at(const Vec3i32 &pos) const
 {
     auto *result = getIfExists(pos);
     VXIO_ASSERT_NOTNULL(result);
     return *result;
 }
 
-template <typename T, size_t SQUASH, typename BranchT>
-bool SparseVoxelOctree<T, SQUASH, BranchT>::contains(const Vec3i32 &pos) const
+template <typename T, typename BranchT>
+bool SparseVoxelOctree<T, BranchT>::contains(const Vec3i32 &pos) const
 {
     if (boundsTest(pos) != 0) {
         return false;
@@ -544,365 +496,40 @@ bool SparseVoxelOctree<T, SQUASH, BranchT>::contains(const Vec3i32 &pos) const
 
 // STRUCTURE MANAGEMENT ================================================================================================
 
-template <typename T, size_t SQUASH, typename BranchT>
-void SparseVoxelOctree<T, SQUASH, BranchT>::clear()
+template <typename T, typename BranchT>
+void SparseVoxelOctree<T, BranchT>::clear()
 {
     root->clear();
 }
 
-template <typename T, size_t SQUASH, typename BranchT>
-void SparseVoxelOctree<T, SQUASH, BranchT>::reserve(u32 lim)
+template <typename T, typename BranchT>
+void SparseVoxelOctree<T, BranchT>::reserve(u32 lim)
 {
     while (lim >= unilateralCapacity()) {
         growOnce();
     }
 }
 
-template <typename T, size_t SQUASH, typename BranchT>
-void SparseVoxelOctree<T, SQUASH, BranchT>::growOnce()
+template <typename T, typename BranchT>
+void SparseVoxelOctree<T, BranchT>::growOnce()
 {
-    VXIO_ASSERT_LT(unilateralCapacity(depth + 1), COORDINATE_UPPER_LIMIT);
-    // Special case for unsquashed octrees.
-    // Unsquashed growth is much simpler because each node receives exactly one new parent.
-    // Within a parent, nodes move into the opposite corner.
-    if constexpr (SQUASH == 0) {
-        for (size_t i = 0; i < 8; ++i) {
-            if (not root->has(i)) {
-                continue;
-            }
-            auto parent = std::make_unique<branch_type>();
-            parent->insert(~i & INDEX_DIGIT_MASK, root->extract(i));
-            root->insert(i, std::move(parent));
+    for (size_t i = 0; i < BRANCHING_FACTOR; ++i) {
+        if (not root->has(i)) {
+            continue;
         }
+        auto parent = std::make_unique<branch_type>();
+        parent->insert(~i & INDEX_DIGIT_MASK, root->extract(i));
+        root->insert(i, std::move(parent));
     }
-    // Regular case for squashed octrees.
-    // tl;dr: we use the more significant digit i to get the position in root, j becomes position in new parent
-    else {
-        constexpr size_t subBranchingFactor = BRANCHING_FACTOR >> 3;
-        constexpr size_t subIndexDigitBits = INDEX_DIGIT_BITS - 3;
-        constexpr size_t subIndexDigitMask = (1 << subIndexDigitBits) - 1;
-        constexpr uint32_t unilateralMax = UNILATERAL_NODE_SIZE - 1;
-        constexpr uint32_t unilateralCenter = unilateralMax / 2;
 
-        constexpr auto calcParentIndexInRoot = [](size_t i) -> size_t {
-            // We deinterleave the most significant digit and add the center onto it.
-            // This gives us a 2x2x2 volume around the center, where all parents are created.
-            const u32 x = ((i >> 2) & 1) + unilateralCenter;
-            const u32 y = ((i >> 1) & 1) + unilateralCenter;
-            const u32 z = ((i >> 0) & 1) + unilateralCenter;
-            if constexpr (SQUASHES == 1) {
-                return detail::ileave3_two(x, y, z);
-            }
-            else {
-                return voxelio::ileave3(x, y, z);
-            }
-        };
-
-        // Yes, using 8 instead of the branching factor is intentional.
-        // There can only be 8 new parents, even when squashing layers.
-        for (size_t i = 0; i < 8; ++i) {
-            // i becomes the most significant digit of the octree node index.
-            const size_t not_i = ~i & 0b111;
-            const size_t childIndexInRoot_hi = i << subIndexDigitBits;
-            const size_t childIndexInParent_hi = not_i << subIndexDigitBits;
-            const size_t parentIndexInRoot = calcParentIndexInRoot(i);
-
-            // Multiple branches can go into the same parent.
-            // Namely, all branches in the current i-iteration go into this parent.
-            uptr<branch_type> parent = nullptr;
-
-            for (size_t j = 0; j < subBranchingFactor; ++j) {
-                // j becomes the concatenation of all less significant digits.
-                const size_t childIndexInRoot = childIndexInRoot_hi | j;
-                if (not root->has(childIndexInRoot)) {
-                    continue;
-                }
-
-                const size_t childIndexInParent = childIndexInParent_hi | j;
-                if (parent != nullptr) {
-                    parent->insert(childIndexInParent, root->extract(childIndexInRoot));
-                    continue;
-                }
-                parent = std::make_unique<branch_type>();
-                parent->insert(childIndexInParent, root->extract(childIndexInRoot));
-
-                // Because we are editing root's children in-place, we run danger of replacing an existing value.
-                // Fortunately, all such children are guaranteed to belong into our new parent anyways.
-                // So we just need to add it to our parent as well in such a case.
-                if (root->has(parentIndexInRoot)) {
-                    // TODO investigate if this really ever happens
-                    size_t lo = parentIndexInRoot & subIndexDigitMask;
-                    size_t obstructingChildIndexInParent = childIndexInParent_hi | lo;
-                    VXIO_DEBUG_ASSERT(not parent->has(obstructingChildIndexInParent));
-                    parent->insert(obstructingChildIndexInParent, root->extract(parentIndexInRoot));
-                }
-
-            }  // for j
-
-            if (parent != nullptr) {
-                // Very important:
-                // We can not do this inside of the j-loop right after creating the parent.
-                // Otherwise we may run into the same value again during the j-loop.
-                root->insert(parentIndexInRoot, std::move(parent));
-            }
-
-        }  // for i
-    }      // else constexpr
     depth += 1;
-}
-
-// ITERATORS ===========================================================================================================
-
-template <typename TSparseVoxelOctree>
-class depth_first_range_impl {
-public:
-    struct iterator;
-
-private:
-    TSparseVoxelOctree *parent;
-
-public:
-    depth_first_range_impl(TSparseVoxelOctree *parent) noexcept : parent{parent}
-    {
-        VXIO_DEBUG_ASSERT_NOTNULL(parent);
-    }
-    depth_first_range_impl(depth_first_range_impl &&) = default;
-    depth_first_range_impl(const depth_first_range_impl &) = default;
-
-    depth_first_range_impl &operator=(depth_first_range_impl &&) = default;
-    depth_first_range_impl &operator=(const depth_first_range_impl &) = default;
-
-    iterator begin() const noexcept
-    {
-        return {parent};
-    }
-
-    iterator end() const noexcept
-    {
-        return {nullptr};
-    }
-};
-
-template <typename TSparseVoxelOctree>
-struct depth_first_range_impl<TSparseVoxelOctree>::iterator {
-private:
-    static constexpr size_t INDEX_DIGIT_BITS = TSparseVoxelOctree::INDEX_DIGIT_BITS;
-    static constexpr size_t BRANCHING_FACTOR = TSparseVoxelOctree::BRANCHING_FACTOR;
-
-    using node_type = typename TSparseVoxelOctree::node_type;
-    using branch_type = typename TSparseVoxelOctree::branch_type;
-    using leaf_type = typename TSparseVoxelOctree::leaf_type;
-
-    struct Pos {
-        node_type *node;
-        size_t index;
-    };
-
-    TSparseVoxelOctree *parent;
-    std::vector<Pos> positionStack;
-    uint64_t morton = 0;
-
-public:
-    static constexpr bool is_const = std::is_const_v<TSparseVoxelOctree>;
-
-    using self_type = iterator;
-    using difference_type = uint64_t;
-    using value_type = std::conditional_t<is_const, node_type, node_type> *;
-    using reference = value_type &;
-    using pointer = value_type *;
-    using iterator_category = std::forward_iterator_tag;
-
-    iterator(TSparseVoxelOctree *parent) noexcept : parent{parent}
-    {
-        if (parent != nullptr) {
-            positionStack.push_back({&parent->rootNode(), 0});
-        }
-    }
-
-    iterator(iterator &&) = default;
-    iterator(const iterator &) = default;
-
-    iterator &operator=(iterator &&) = default;
-    iterator &operator=(const iterator &) = default;
-
-    /**
-     * @brief Returns the current base index of the iterator.
-     * This result is only geometrically meaningful for leaf nodes.
-     * For branch nodes, it can be used to test for equality.
-     *
-     * Base index means the minimum index of all voxels inside of the leaf node.
-     *
-     * Calling this for an iterator which has reached the end is undefined behavior.
-     * @return the current base index
-     */
-    uint64_t index() const noexcept
-    {
-        VXIO_DEBUG_ASSERTM(not positionStack.empty(), "Can't call index() for an iterator which is empty");
-        return morton << INDEX_DIGIT_BITS;
-    }
-
-    /**
-     * @brief Returns the current node at which the iterator resides.
-     * Calling this for an iterator which has reached the end is undefined behavior.
-     * @return the current node
-     */
-    value_type node() const noexcept
-    {
-        VXIO_DEBUG_ASSERTM(not positionStack.empty(), "Can't call node() for an iterator which is empty");
-        return positionStack.back().node;
-    }
-
-    /**
-     * @brief Returns the type of node at which the iterator resides.
-     * Calling this for an iterator which has reached the end is undefined behavior.
-     * @return the current node type
-     */
-    SvoNodeType nodeType() const noexcept
-    {
-        VXIO_DEBUG_ASSERTM(not positionStack.empty(), "Can't call nodeType() for an iterator which is empty");
-        // We make a decision based only on the stack size.
-        // This saves a virtual call to get the node type from the top of the stack.
-        SvoNodeType result = positionStack.size() == parent->depthAbsolute() ? SvoNodeType::LEAF : SvoNodeType::BRANCH;
-        VXIO_DEBUG_ASSERT_EQ(result, positionStack.back().node->type());
-        return result;
-    }
-
-    /// Returns true exactly when the iterator is at a leaf node.
-    /// Calling this for an iterator which has reached the end is undefined behavior.
-    bool isAtLeaf() noexcept
-    {
-        return nodeType() == SvoNodeType::LEAF;
-    }
-
-    /// Returns true exactly when the iterator is at a branch node.
-    /// Calling this for an iterator which has reached the end is undefined behavior.
-    bool isAtBranch() noexcept
-    {
-        return nodeType() == SvoNodeType::BRANCH;
-    }
-
-    /**
-     * @brief Returns the current base position of the node of the iterator in 3D-space.
-     * This result is only meaningful for leaf nodes.
-     *
-     * Base position means the minimum position of all voxels inside of the leaf node.
-     *
-     * Calling this for an iterator which has reached the end is undefined behavior.
-     * @return the current base position in 3D-space
-     */
-    voxelio::Vec3i32 pos() const noexcept
-    {
-        return parent->indexToPos(index());
-    }
-
-    /**
-     * @brief Tells the iterator to go deeper into the SVO.
-     * This is the behavior of operator++().
-     *
-     * If it is not possible to go any deeper, the next subbranch of the parent is visited.
-     * This decision is made recurively.
-     *
-     * Calling this for an iterator which has reached the end is undefined behavior.
-     */
-    void goDeeper() noexcept
-    {
-        traverse(false);
-    }
-
-    /**
-     * @brief Tells the iterator to abandon the current branch and visit the next branch of the parent.
-     *
-     * If it is not possible to go any deeper starting from the parent, the next subbranch of its parent is visited.
-     * This decision is made recurively.
-     *
-     * Going sideways is equivalent to going up one level in the tree and then going deeper.
-     *
-     * Calling this for an iterator which has reached the end is undefined behavior.
-     */
-    void goSideways() noexcept
-    {
-        traverse(true);
-    }
-
-    self_type &operator++() noexcept
-    {
-        goDeeper();
-        return *this;
-    }
-
-    bool operator==(const self_type &other) const noexcept
-    {
-        return this->positionStack.size() == other.positionStack.size() && this->morton == other.morton;
-    }
-
-    bool operator!=(const self_type &other) const noexcept
-    {
-        return not operator==(other);
-    }
-
-    value_type operator*() noexcept
-    {
-        return node();
-    }
-
-private:
-    void traverse(bool forceOnePop) noexcept;
-
-    bool handleReachedEndOfNodeAndSignalRootPop() noexcept;
-};
-
-template <typename TSparseVoxelOctree>
-void depth_first_range_impl<TSparseVoxelOctree>::iterator::traverse(bool forceOnePop) noexcept
-{
-    VXIO_DEBUG_ASSERTM(not positionStack.empty(), "Called traverse() on empty iterator");
-    VXIO_DEBUG_ASSERT_NOTNULL(positionStack.back().node);
-
-    if (forceOnePop || isAtLeaf()) {
-        if (handleReachedEndOfNodeAndSignalRootPop()) {
-            return;
-        }
-    }
-    VXIO_DEBUG_ASSERT_NOTNULL(positionStack.back().node);
-
-    do {
-        Pos &pos = positionStack.back();
-        auto *branch = voxelio::downcast<branch_type *>(pos.node);
-        for (; pos.index < BRANCHING_FACTOR; ++pos.index) {
-            node_type *child = branch->child(pos.index);
-            if (child != nullptr) {
-                morton <<= INDEX_DIGIT_BITS;
-                morton |= pos.index;
-                positionStack.push_back({child, 0});
-                return;
-            }
-        }
-        if (handleReachedEndOfNodeAndSignalRootPop()) {
-            return;
-        }
-    } while (true);
-}
-
-template <typename TSparseVoxelOctree>
-bool depth_first_range_impl<TSparseVoxelOctree>::iterator::handleReachedEndOfNodeAndSignalRootPop() noexcept
-{
-    VXIO_DEBUG_ASSERT(not positionStack.empty());
-    do {
-        positionStack.pop_back();
-        morton >>= INDEX_DIGIT_BITS;
-        if (positionStack.empty()) {
-            return true;
-        }
-        if (++positionStack.back().index < BRANCHING_FACTOR) {
-            return false;
-        }
-    } while (true);
 }
 
 // FUNCTIONAL ==========================================================================================================
 
-template <typename T, size_t SQUASH, typename BT>
+template <typename T, typename BT>
 template <typename Consumer>
-void SparseVoxelOctree<T, SQUASH, BT>::forEachNodeTopDown_impl(const Consumer &consumer)
+void SparseVoxelOctree<T, BT>::forEachNodeTopDown_impl(const Consumer &consumer)
 {
     static_assert(isNodeConsumer<Consumer>);
 
@@ -952,9 +579,9 @@ void SparseVoxelOctree<T, SQUASH, BT>::forEachNodeTopDown_impl(const Consumer &c
     }
 }
 
-template <typename T, size_t SQUASH, typename BT>
+template <typename T, typename BT>
 template <typename Consumer>
-void SparseVoxelOctree<T, SQUASH, BT>::forEachNodeBottomUp_impl(const Consumer &consumer)
+void SparseVoxelOctree<T, BT>::forEachNodeBottomUp_impl(const Consumer &consumer)
 {
     static_assert(isNodeConsumer<Consumer>);
 
@@ -1002,138 +629,21 @@ void SparseVoxelOctree<T, SQUASH, BT>::forEachNodeBottomUp_impl(const Consumer &
 
 // FUNCTIONAL EXTERNAL FUNCTIONS =======================================================================================
 
-/**
- * @brief Invokes a void(leaf_type*) consumer function for every leaf node in the SVO.
- */
-template <
-    typename Consumer,
-    typename T,
-    size_t SQUASH = 0,
-    typename BT = void,
-    std::enable_if_t<std::is_invocable_r_v<void, Consumer, typename SparseVoxelOctree<T, SQUASH, BT>::leaf_type *>,
-                     int> = 0>
-void forEachLeaf(SparseVoxelOctree<T, SQUASH, BT> &svo, const Consumer &consumer)
-{
-    using svo_type = std::remove_reference_t<decltype(svo)>;
-
-    svo.forEachNodeTopDown([&consumer](typename svo_type::node_type *node, SvoNodeType type) {
-        if (type == SvoNodeType::LEAF) {
-            consumer(voxelio::downcast<typename svo_type::leaf_type *>(node));
-        }
-    });
-}
-
-/**
- * @brief Invokes a void(branch_type*) consumer function for every branch node in the SVO.
- */
-template <
-    typename Consumer,
-    typename T,
-    size_t SQUASH = 0,
-    typename BT = void,
-    std::enable_if_t<std::is_invocable_r_v<void, Consumer, typename SparseVoxelOctree<T, SQUASH, BT>::branch_type *>,
-                     int> = 0>
-void forEachBranch(SparseVoxelOctree<T, SQUASH, BT> &svo, const Consumer &consumer)
-{
-    using svo_type = std::remove_reference_t<decltype(svo)>;
-
-    svo.forEachNodeTopDown([&consumer](typename svo_type::node_type *node, SvoNodeType type) {
-        if (type == SvoNodeType::BRANCH) {
-            consumer(voxelio::downcast<typename svo_type::branch_type *>(node));
-        }
-    });
-}
-
-/**
- * @brief Invokes a void(value_type&) consumer function for every voxel in the svo.
- */
-template <typename Consumer,
-          typename T,
-          size_t SQUASH,
-          typename BT,
-          std::enable_if_t<std::is_invocable_r_v<void, Consumer, T &>, int> = 0>
-void forEachValue(SparseVoxelOctree<T, SQUASH, BT> &svo, const Consumer &consumer)
-{
-    using svo_type = std::remove_reference_t<decltype(svo)>;
-    using leaf_type = typename svo_type::leaf_type;
-    using value_type = typename svo_type::value_type;
-
-    forEachLeaf([&consumer](leaf_type *leaf) -> void {
-        for (size_t i = 0; i < svo_type::BRANCHING_FACTOR; ++i) {
-            value_type *value = leaf->at(i);
-            if (value != nullptr) {
-                consumer(*value);
-            }
-        }
-    });
-}
-
-/**
- * @brief Invokes a void(Vec3i32, value_type&) consumer function for every voxel in the svo.
- */
-template <typename Consumer,
-          typename T,
-          size_t SQUASH,
-          typename BT,
-          std::enable_if_t<std::is_invocable_r_v<void, Consumer, voxelio::Vec3i32, T &>, int> = 0>
-void forEachVoxel(SparseVoxelOctree<T, SQUASH, BT> &svo, const Consumer &consumer)
-{
-    using svo_type = std::remove_reference_t<decltype(svo)>;
-    using leaf_type = typename svo_type::leaf_type;
-
-    constexpr size_t loopLimit = svo_type::UNILATERAL_NODE_SIZE;
-
-    constexpr auto indexOf_singleDigit = [](uint32_t x, uint32_t y, uint32_t z) -> uint64_t {
-        if constexpr (SQUASH == 0) {
-            return detail::ileave3_one(x, y, z);
-        }
-        else if constexpr (SQUASH == 1) {
-            return detail::ileave3_two(x, y, z);
-        }
-        else {
-            return voxelio::ileave3(x, y, z);
-        }
-    };
-
-    // We need to use iterators instead of forEachLeaf to easily obtain the base 3D position of a leaf.
-    auto range = svo.depthFirstNodeRange();
-    auto end = range.end();
-    for (auto iter = range.begin(); iter != end; ++iter) {
-        if (iter.isAtBranch()) {
-            continue;
-        }
-        auto *leaf = voxelio::downcast<leaf_type *>(iter.node());
-        voxelio::Vec3i32 basePos = iter.pos();
-        for (uint32_t x = 0; x < loopLimit; ++x) {
-            for (uint32_t y = 0; y < loopLimit; ++y) {
-                for (uint32_t z = 0; z < loopLimit; ++z) {
-                    uint32_t index = indexOf_singleDigit(x, y, z);
-                    if (leaf->has(index)) {
-                        voxelio::Vec3u32 upos = {x, y, z};
-                        consumer(basePos + upos.cast<int32_t>(), leaf->at(index));
-                    }
-                }
-            }
-        }
-    }
-}
-
 namespace detail {
 
 template <bool EXPAND,
           typename Reduction,
           typename T,
-          size_t SQUASH,
           typename BT,
           std::enable_if_t<std::is_invocable_r_v<void,
                                                  Reduction,
-                                                 typename SparseVoxelOctree<T, SQUASH, BT>::node_type *[],
+                                                 typename SparseVoxelOctree<T, BT>::node_type *[],
                                                  size_t,
-                                                 typename SparseVoxelOctree<T, SQUASH, BT>::branch_type &>,
+                                                 typename SparseVoxelOctree<T, BT>::branch_type &>,
                            int> = 0>
-void reduceOrExpandNodes(SparseVoxelOctree<T, SQUASH, BT> &svo, const Reduction &reduction)
+void reduceOrExpandNodes(SparseVoxelOctree<T, BT> &svo, const Reduction &reduction)
 {
-    using svo_type = std::remove_reference_t<decltype(svo)>;
+    using svo_type = SparseVoxelOctree<T, BT>;
     using node_type = typename svo_type::node_type;
     using branch_type = typename svo_type::branch_type;
 
@@ -1165,61 +675,32 @@ void reduceOrExpandNodes(SparseVoxelOctree<T, SQUASH, BT> &svo, const Reduction 
 
 template <typename Reduction,
           typename T,
-          size_t SQUASH,
           typename BT,
           std::enable_if_t<std::is_invocable_r_v<void,
                                                  Reduction,
-                                                 typename SparseVoxelOctree<T, SQUASH, BT>::node_type *[],
+                                                 typename SparseVoxelOctree<T, BT>::node_type *[],
                                                  size_t,
-                                                 typename SparseVoxelOctree<T, SQUASH, BT>::branch_type &>,
+                                                 typename SparseVoxelOctree<T, BT>::branch_type &>,
                            int> = 0>
-void reduceNodes(SparseVoxelOctree<T, SQUASH, BT> &svo, const Reduction &reduction)
+void reduceNodes(SparseVoxelOctree<T, BT> &svo, const Reduction &reduction)
 {
     return detail::reduceOrExpandNodes<false>(svo, reduction);
 }
 
 template <typename Reduction,
           typename T,
-          size_t SQUASH,
           typename BT,
           std::enable_if_t<std::is_invocable_r_v<void,
                                                  Reduction,
-                                                 typename SparseVoxelOctree<T, SQUASH, BT>::node_type *[],
+                                                 typename SparseVoxelOctree<T, BT>::node_type *[],
                                                  size_t,
-                                                 typename SparseVoxelOctree<T, SQUASH, BT>::branch_type &>,
+                                                 typename SparseVoxelOctree<T, BT>::branch_type &>,
                            int> = 0>
-void expandNodes(SparseVoxelOctree<T, SQUASH, BT> &svo, const Reduction &reduction)
+void expandNodes(SparseVoxelOctree<T, BT> &svo, const Reduction &reduction)
 {
     return detail::reduceOrExpandNodes<true>(svo, reduction);
 }
 
-template <typename Reduction,
-          typename T,
-          size_t SQUASH,
-          typename BT,
-          std::enable_if_t<std::is_invocable_r_v<typename SparseVoxelOctree<T, SQUASH, BT>::branch_value_type,
-                                                 Reduction,
-                                                 typename SparseVoxelOctree<T, SQUASH, BT>::branch_value_type[],
-                                                 size_t>,
-                           int> = 0>
-void reduceNodeValues(SparseVoxelOctree<T, SQUASH, BT> &svo, const Reduction &reduction)
-{
-    using svo_type = SparseVoxelOctree<T, SQUASH, BT>;
-    using node_type = typename svo_type::node_type;
-    using branch_type = typename svo_type::branch_type;
-    using branch_value_type = typename svo_type::branch_value_type;
-
-    branch_value_type buffer[svo_type::BRANCHING_FACTOR];
-
-    reduceNodes(svo, [&buffer, &reduction](node_type *children[], size_t count, branch_type &parent) {
-        for (size_t i = 0; i < count; ++i) {
-            buffer[i] = children[i]->value();
-            branch_value_type result = reduction(buffer, count);
-            parent.value() = std::move(result);
-        }
-    });
-}
-
-}  // namespace mve
+}  // namespace flvc
 
 #endif  // SVO_HPP

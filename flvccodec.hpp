@@ -1,13 +1,7 @@
 #ifndef FLVC_CODEC_HPP
 #define FLVC_CODEC_HPP
 
-// this file is presently shared between the FLVC project and MVE via a hardlink
-// (I know, that is such a filthy practice, it will be fixed soon)
-#ifdef MVE_MAJOR
-#include "core_structs/svo.hpp"
-#else
 #include "svo.hpp"
-#endif
 
 #include "flvcconst.hpp"
 #include "permutation.hpp"
@@ -162,9 +156,9 @@ protected:
         return static_cast<std::underlying_type_t<NodeType>>(type) < 0;
     }
 
-    static constexpr NodeType nodeTypeOf(mve::SvoNodeType type) noexcept
+    static constexpr NodeType nodeTypeOf(SvoNodeType type) noexcept
     {
-        return type == mve::SvoNodeType::BRANCH ? NodeType::BRANCH : NodeType::LEAF;
+        return type == SvoNodeType::BRANCH ? NodeType::BRANCH : NodeType::LEAF;
     }
 
     State state = STATE_INITIAL;
@@ -303,12 +297,10 @@ struct Header {
  */
 class Encoder : public CodecBase {
 private:
-    using svo_type = mve::SparseVoxelOctree<size_t, 0, size_t>;
+    using svo_type = SparseVoxelOctree<size_t, size_t>;
     using node_type = svo_type::node_type;
     using leaf_type = svo_type::leaf_type;
     using branch_type = svo_type::branch_type;
-
-    using SvoNodeType = mve::SvoNodeType;
 
     voxelio::OutputStream &stream;
     voxelio::deflate::Deflator deflator;
@@ -380,8 +372,6 @@ private:
 class Decoder : public CodecBase {
 private:
     using index_t = uint32_t;
-
-    using SvoNodeType = mve::SvoNodeType;
 
     struct Frame {
         /// The data of the eight nodes on the current stack level.
