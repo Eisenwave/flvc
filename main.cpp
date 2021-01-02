@@ -25,7 +25,7 @@ using namespace voxelio;
 
 namespace {
 
-constexpr const char *HEADER = "Fast Lossless Voxel Compression.";
+constexpr const char *HEADER = "Free Lossless Voxel Compression.";
 constexpr const char *FOOTER = "--------------------------------";
 
 constexpr const char *INPUT_DESCR =
