@@ -399,12 +399,9 @@ void Encoder::optimizeSvo_initAttribDataForOneNode(node_type &node, SvoNodeType 
 {
     VXIO_DEBUG_ASSERT(not node.empty());
     usize resultIndex = allocAttribute();
-    auto mask = static_cast<u8>(node.mask().to_ulong());
-    if (type == SvoNodeType::LEAF && node.full()) {
-        mask = 0;
-    }
     VXIO_DEBUG_ASSERT_LT(resultIndex, attribData.size());
-    attribData[resultIndex] = mask;
+
+    attribData[resultIndex] = type == SvoNodeType::LEAF && node.full() ? 0 : node.mask();
     node.value = resultIndex;
 }
 
@@ -498,7 +495,7 @@ ResultCode Encoder::write()
     return ResultCode::OK;
 }
 
-#define DANNOTATE(str) \
+#define FLVC_ANNOTATE(str) \
     if constexpr (ANNOTATE_BINARY) stream.writeString("(" + std::string(str) + ")")
 
 bool Encoder::writeHeader()
@@ -507,7 +504,7 @@ bool Encoder::writeHeader()
     constexpr u8 pad[6] = "(def)";
 
     stream.writeBig(MAGIC);
-    DANNOTATE("version");
+    FLVC_ANNOTATE("version");
     stream.write(version, 2);
 
     const Vec3i32 min = svo.minIncl();
@@ -515,40 +512,40 @@ bool Encoder::writeHeader()
     const Vec3u32 size = (max - min).cast<u32>();
     const bool empty = svo.empty();
 
-    DANNOTATE("volume_info::offset");
+    FLVC_ANNOTATE("volume_info::offset");
     stream.writeLittle<3, i32>(min.data());
-    DANNOTATE("volume_info::size");
+    FLVC_ANNOTATE("volume_info::size");
     stream.writeLittle<3, u32>(size.data());
-    DANNOTATE("volume_info::empty");
+    FLVC_ANNOTATE("volume_info::empty");
     stream.writeU8(empty);
 
     // This padding makes the size of the constant-sized part of the header 40 (multiple of 8).
     // As a result we can examine this part as an array of 64-bit integers if we want to.
-    DANNOTATE("padding");
+    FLVC_ANNOTATE("padding");
     stream.write(pad, 5);
 
     VXIO_DEBUG_ASSERT_EQ(stream.position(), 40);
 
-    DANNOTATE("definitions_size");
+    FLVC_ANNOTATE("definitions_size");
     stream.writeLittle(static_cast<u16>(attribDefs.size()));
-    DANNOTATE("definitions");
+    FLVC_ANNOTATE("definitions");
     for (const AttributeDef &attr : attribDefs) {
-        DANNOTATE("identifier::length");
+        FLVC_ANNOTATE("identifier::length");
         stream.writeU8(static_cast<u8>(attr.identifier.size()));
-        DANNOTATE("identifier::data");
+        FLVC_ANNOTATE("identifier::data");
         stream.write(reinterpret_cast<const u8 *>(attr.identifier.data()), attr.identifier.size());
-        DANNOTATE("type");
+        FLVC_ANNOTATE("type");
         stream.writeU8(static_cast<u8>(attr.type));
-        DANNOTATE("cardinality");
+        FLVC_ANNOTATE("cardinality");
         stream.writeU8(attr.cardinality);
-        DANNOTATE("modifiers");
+        FLVC_ANNOTATE("modifiers");
         stream.writeLittle<u16>(attr.modifiers);
     }
 
-    DANNOTATE("reserved");
+    FLVC_ANNOTATE("reserved");
     stream.writeU8('|');
 
-    DANNOTATE("content");
+    FLVC_ANNOTATE("content");
     const bool good = stream.good();
 
     state = good ? (empty ? STATE_IO_DONE : STATE_IO_STARTED) : STATE_FAILED;
@@ -647,7 +644,7 @@ bool Encoder::writeNode(node_type &node, SvoNodeType type)
             atLeaf ? NodeType::VOXEL : complete ? NodeType::COMPLETE : nodeTypeOf(downcast<branch_type &>(node).type());
         const char annotationChar = annotationCharOf(type);
 
-        DANNOTATE(annotationChar + std::string{"*"} + stringify(childCount));
+        FLVC_ANNOTATE(annotationChar + std::string{"*"} + stringify(childCount));
         stream.write(writeBegin, writeSize);
         return stream.good();
     }
@@ -671,7 +668,7 @@ bool Encoder::writeAttribData(usize attribIndex, NodeType type)
     const usize dataLength = encodedAttribSize - isComplete(type);
 
     if constexpr (ANNOTATE_BINARY) {
-        DANNOTATE(std::string(1, annotationCharOf(type)));
+        FLVC_ANNOTATE(std::string(1, annotationCharOf(type)));
         stream.write(begin, dataLength);
         return stream.good();
     }

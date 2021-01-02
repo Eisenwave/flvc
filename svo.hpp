@@ -8,7 +8,6 @@
 #include "voxelio/src/vec.hpp"
 
 #include <array>
-#include <bitset>
 #include <memory>
 #include <stack>
 #include <vector>
@@ -76,7 +75,7 @@ class SvoNodeBase {
 protected:
     static constexpr size_t N = 8;
 
-    std::bitset<N> mask_{};
+    uint8_t mask_ = 0;
 
 public:
     SvoNodeBase() = default;
@@ -92,7 +91,7 @@ protected:
     virtual void doClear() = 0;
 
 public:
-    const std::bitset<N> &mask() const
+    uint8_t mask() const
     {
         return mask_;
     }
@@ -104,13 +103,13 @@ public:
      */
     size_t count() const
     {
-        return mask_.count();
+        return voxelio::popCount(mask());
     }
 
     void clear()
     {
         doClear();
-        mask_.reset();
+        mask_ = 0;
     }
 
     /**
@@ -120,7 +119,7 @@ public:
      */
     bool empty() const
     {
-        return mask_.none();
+        return mask_ == 0;
     }
 
     /**
@@ -130,7 +129,7 @@ public:
      */
     bool full() const
     {
-        return mask_.all();
+        return mask_ == 0xff;
     }
 
     /**
@@ -141,7 +140,7 @@ public:
     bool has(size_t index) const
     {
         VXIO_DEBUG_ASSERT_LT(index, N);
-        return mask_.test(index);
+        return voxelio::getBit(this->mask_, index);
     }
 
     /**
@@ -150,7 +149,7 @@ public:
      */
     size_t firstIndex() const
     {
-        return voxelio::countTrailingZeros(static_cast<uint8_t>(mask_.to_ullong()));
+        return voxelio::countTrailingZeros(mask());
     }
 
     virtual SvoNodeType type() const = 0;
@@ -213,7 +212,7 @@ public:
     {
         VXIO_DEBUG_ASSERT_LT(index, N);
         VXIO_DEBUG_ASSERT(this->has(index));
-        this->mask_.reset(index);
+        this->mask_ = voxelio::clearBit(this->mask_, index);
         return std::move(children[index]);
     }
 
@@ -221,7 +220,7 @@ public:
     {
         VXIO_DEBUG_ASSERT_LT(index, N);
         children[index] = std::move(node);
-        this->mask_.set(index);
+        this->mask_ = voxelio::setBit(this->mask_, index);
     }
 
     SvoBranch &operator=(SvoBranch &&moveOf) = default;
@@ -280,7 +279,8 @@ public:
 
     T &operator[](size_t index)
     {
-        this->mask_.set(index);
+        VXIO_DEBUG_ASSERT_LT(index, N);
+        this->mask_ = voxelio::setBit(this->mask_, index);
         return data[index];
     }
 };
