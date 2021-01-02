@@ -1,5 +1,5 @@
-#ifndef PERMUTATION_HPP
-#define PERMUTATION_HPP
+#ifndef FLVC_PERMUTATION_HPP
+#define FLVC_PERMUTATION_HPP
 
 #include "voxelio/src/assert.hpp"
 
@@ -350,4 +350,4 @@ inline void Permutation::findCycles()
 
 }  // namespace flvc
 
-#endif  // PERMUTATION_HPP
+#endif  // FLVC_PERMUTATION_HPP

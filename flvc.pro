@@ -22,7 +22,6 @@ HEADERS += flvattrib.hpp \
            flvcconfig.hpp \
            flvcconst.hpp \
            permutation.hpp \
-           svo_nodes.hpp \
            svo.hpp
            
 SOURCES += flvccodec.cpp \

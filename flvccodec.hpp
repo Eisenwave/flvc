@@ -2,7 +2,6 @@
 #define FLVC_CODEC_HPP
 
 #include "svo.hpp"
-
 #include "flvcconst.hpp"
 #include "permutation.hpp"
 
