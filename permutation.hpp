@@ -28,12 +28,10 @@ struct Permutation {
 public:
     static Permutation identity(size_t size)
     {
+        // using std::iota would have been more concise but requires <numeric>
         Permutation result(size);
         for (size_t i = 0; i < size; ++i) {
             result[i] = i;
-        }
-        for (size_t i = 0; i < size; ++i) {
-            result.perm.push_back(i);
         }
         return result;
     }
@@ -41,26 +39,23 @@ public:
 private:
     /// The single vector which stores both the permutation AND the indices of the cycles starts.
     std::vector<size_t> perm;
-    size_t permSize;
 
     /// Constructs an empty permutation initialized to all-zeros.
-    Permutation(size_t size) : perm(size), permSize(size) {}
+    Permutation(size_t size) : perm(size) {}
 
 public:
     /// Constructs a permutation from a table.
     /// No error handling is performed, it is assumed the the permutation is valid.
-    Permutation(const size_t table[], size_t size) : perm{table, table + size}, permSize{size}
+    Permutation(const size_t table[], size_t size) : perm{table, table + size}
     {
         integrityCheck();
-        findCycles();
     }
 
     /// Constructs a permutation from a table.
     /// No error handling is performed, it is assumed the the permutation is valid.
-    explicit Permutation(std::vector<size_t> table) : perm{std::move(table)}, permSize{perm.size()}
+    explicit Permutation(std::vector<size_t> table) : perm{std::move(table)}
     {
         integrityCheck();
-        findCycles();
     }
 
     Permutation(std::initializer_list<size_t> table) : Permutation{std::vector<size_t>(table)} {}
@@ -86,24 +81,6 @@ public:
     {
         for (size_t i = 0; i < size(); ++i) {
             dest[i] = src[perm[i]];
-        }
-    }
-
-    /**
-     * @brief Applies the permutation to a single destination array.
-     * This method takes about twice as long as the two-array version due to use of swap instead of simple moves.
-     * Whenever possible, the two-operand version should be preferred.
-     * @param data the destination
-     */
-    template <typename T>
-    void apply(T data[]) const
-    {
-        VXIO_DEBUG_ASSERT_EQ(size() != 0, size() != perm.size());
-        for (size_t cycle = permSize; cycle < perm.size(); ++cycle) {
-            const size_t start = perm[cycle];
-            for (size_t prev = start, next = perm[prev]; next != start; prev = next, next = perm[next]) {
-                std::swap(data[prev], data[next]);
-            }
         }
     }
 
@@ -151,25 +128,7 @@ public:
      */
     size_t size() const
     {
-        return permSize;
-    }
-
-    /**
-     * @brief Returns the number of cycles in this permutation.
-     * @return the numberr of cycles
-     */
-    size_t cycleCount() const
-    {
-        return perm.size() - permSize;
-    }
-
-    /**
-     * @brief Returns true if the permutatation is an identity permutation.
-     * @return true if the permutation is an identity permutation
-     */
-    bool isIdentity() const
-    {
-        return cycleCount() == size();
+        return perm.size();
     }
 
     const size_t *begin() const
@@ -242,7 +201,6 @@ private:
         return true;
     }
 
-    void findCycles();
 };
 
 inline Permutation Permutation::append(const Permutation &other) const
@@ -255,7 +213,6 @@ inline Permutation Permutation::append(const Permutation &other) const
     }
 
     result.integrityCheck();
-    result.findCycles();
     return result;
 }
 
@@ -269,7 +226,6 @@ inline Permutation Permutation::prepend(const Permutation &other) const
     }
 
     result.integrityCheck();
-    result.findCycles();
     return result;
 }
 
@@ -326,26 +282,7 @@ inline Permutation Permutation::inverse() const
         result[operator[](i)] = i;
     }
 
-    result.findCycles();
     return result;
-}
-
-inline void Permutation::findCycles()
-{
-    perm.resize(size());
-    std::vector<bool> visited(size());
-
-    for (size_t i = 0; i < size(); ++i) {
-        if (visited[i]) {
-            continue;
-        }
-        for (size_t j = i; not visited[j];) {
-            visited[j] = true;
-            j = perm[j];
-            VXIO_DEBUG_ASSERT_LT(j, size());
-        }
-        perm.push_back(i);
-    }
 }
 
 }  // namespace flvc
