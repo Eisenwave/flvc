@@ -405,7 +405,7 @@ void Encoder::optimizeSvo_initAttribDataForOneNode(node_type &node, SvoNodeType 
     }
     VXIO_DEBUG_ASSERT_LT(resultIndex, attribData.size());
     attribData[resultIndex] = mask;
-    node.value() = resultIndex;
+    node.value = resultIndex;
 }
 
 void Encoder::optimizeSvo_reduceCompleteMasks(node_type *children[], usize count, branch_type &parent)
@@ -419,12 +419,12 @@ void Encoder::optimizeSvo_reduceCompleteMasks(node_type *children[], usize count
     }
     u8 combinedChildMask = 0;
     for (usize i = 0; i < count; ++i) {
-        usize childAttribIndex = children[i]->value();
+        usize childAttribIndex = children[i]->value;
         VXIO_DEBUG_ASSERT_LT(childAttribIndex, attribData.size());
         combinedChildMask |= attribData[childAttribIndex];
     }
     if (combinedChildMask == 0) {
-        usize parentAttribIndex = parent.value();
+        usize parentAttribIndex = parent.value;
         VXIO_DEBUG_ASSERT_LT(parentAttribIndex, attribData.size());
         attribData[parentAttribIndex] = 0;
     }
@@ -441,7 +441,7 @@ void Encoder::optimizeSvo_computeAttributeDeltas(node_type *children[], usize co
             node_type &child = *children[i];
             leaf_type &leaf = downcast<leaf_type &>(child);
 
-            deltaKernel.reset(begin + leaf.value() + 1);
+            deltaKernel.reset(begin + leaf.value + 1);
 
             for (usize j = 0; j < svo_type::BRANCHING_FACTOR; ++j) {
                 if (not child.has(j)) {
@@ -455,13 +455,13 @@ void Encoder::optimizeSvo_computeAttributeDeltas(node_type *children[], usize co
         }
     }
 
-    usize parentAttribOffset = parent.value() + 1;
+    usize parentAttribOffset = parent.value + 1;
     deltaKernel.reset(attribData.data() + parentAttribOffset);
 
     for (usize i = 0; i < count; ++i) {
         node_type &child = *children[i];
 
-        usize childAttribOffset = child.value() + 1;
+        usize childAttribOffset = child.value + 1;
         deltaKernel.pushChild(attribData.data() + childAttribOffset);
     }
 
@@ -561,7 +561,7 @@ bool Encoder::writeSvo()
 {
     VXIO_ASSERT_NE(state, STATE_IO_DONE);
 
-    usize rootAttribIndex = svo.rootNode().value();
+    usize rootAttribIndex = svo.rootNode().value;
     writeAttribData(rootAttribIndex, NodeType::BRANCH);
 
     bool writeSuccess = true;
@@ -584,7 +584,7 @@ bool Encoder::writeNode(node_type &node, SvoNodeType type)
     VXIO_DEBUG_ASSERT_LT(firstIndex, 8);
 
     const bool atLeaf = type == SvoNodeType::LEAF;
-    const bool complete = attribData[node.value()] == 0;
+    const bool complete = attribData[node.value] == 0;
     const bool noGeometry = complete || atLeaf;
     const usize childCount = node.count();
 
@@ -604,7 +604,7 @@ bool Encoder::writeNode(node_type &node, SvoNodeType type)
         }
 
         usize childAttribIndex =
-            atLeaf ? downcast<leaf_type &>(node).at(i) : downcast<branch_type &>(node).child(i)->value();
+            atLeaf ? downcast<leaf_type &>(node).at(i) : downcast<branch_type &>(node).child(i)->value;
 
         std::memcpy(begin + offset, begin + childAttribIndex, encodedAttribSize);
         offset += encodedAttribSize;

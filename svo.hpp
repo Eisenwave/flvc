@@ -35,6 +35,7 @@ constexpr uint32_t abs_svo(int32_t x)
 {
     // It is crucial that we first add 1, then negate.
     // This prevents signed integer underflow which is ub in C++17-.
+    // For two's complement, this can be implemented by bit-flipping negative numbers. (sar 31, xor)
     return static_cast<uint32_t>(x < 0 ? -(x + 1) : x);
 }
 
@@ -49,16 +50,6 @@ constexpr voxelio::Vec3u32 dileave3_one(uint64_t n)
 {
     return voxelio::Vec3u64{(n >> 2) & 1, (n >> 1) & 1, (n >> 0) & 1}.cast<uint32_t>();
 }
-
-/// A container type which is empty when T is void and otherwise stores the type.
-template <typename T>
-struct Voidable {
-    T value;
-};
-
-template <>
-struct Voidable<void> {
-};
 
 }  // namespace detail
 
@@ -79,28 +70,28 @@ constexpr const char *nameOf(SvoNodeType type)
 
 // NODE CLASSES ========================================================================================================
 
-template <typename BT = void>
-class SvoNode {
-private:
+namespace detail {
+
+class SvoNodeBase {
+protected:
     static constexpr size_t N = 8;
 
-    detail::Voidable<BT> val;
-
-protected:
     std::bitset<N> mask_{};
 
+public:
+    SvoNodeBase() = default;
+    virtual ~SvoNodeBase() = default;
+
+    SvoNodeBase(SvoNodeBase &&) = default;
+    SvoNodeBase(const SvoNodeBase &) = delete;
+
+    SvoNodeBase &operator=(SvoNodeBase &&) = default;
+    SvoNodeBase &operator=(const SvoNodeBase &) = delete;
+
+protected:
     virtual void doClear() = 0;
 
 public:
-    SvoNode() = default;
-    virtual ~SvoNode() = default;
-
-    SvoNode(SvoNode &&) = default;
-    SvoNode(const SvoNode &) = delete;
-
-    SvoNode &operator=(SvoNode &&) = default;
-    SvoNode &operator=(const SvoNode &) = delete;
-
     const std::bitset<N> &mask() const
     {
         return mask_;
@@ -162,19 +153,19 @@ public:
         return voxelio::countTrailingZeros(static_cast<uint8_t>(mask_.to_ullong()));
     }
 
-    template <typename V = BT, std::enable_if_t<not std::is_void_v<V>, int> = 0>
-    auto &value()
-    {
-        return val.value;
-    }
-
-    template <typename V = BT, std::enable_if_t<not std::is_void_v<V>, int> = 0>
-    const auto &value() const
-    {
-        return val.value;
-    }
-
     virtual SvoNodeType type() const = 0;
+};
+
+}  // namespace detail
+
+template <typename T = void>
+class SvoNode : public detail::SvoNodeBase {
+public:
+    T value;
+};
+
+template <>
+class SvoNode<void> : public detail::SvoNodeBase {
 };
 
 template <typename BT = void>
