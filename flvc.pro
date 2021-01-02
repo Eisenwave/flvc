@@ -15,7 +15,7 @@ CONFIG(debug, debug|release) {
 
 LIBS += -lstdc++fs
 
-INCLUDEPATH += src 
+INCLUDEPATH += voxelio/src
 
 HEADERS += flvattrib.hpp \
            flvccodec.hpp \

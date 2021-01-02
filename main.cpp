@@ -2,8 +2,8 @@
 
 #include "bits.hpp"
 #include "filetype.hpp"
-#include "stream.hpp"
 #include "log.hpp"
+#include "stream.hpp"
 #include "stringmanip.hpp"
 #include "voxelio.hpp"
 
@@ -30,26 +30,25 @@ constexpr const char *FOOTER = "--------------------------------";
 
 constexpr const char *INPUT_DESCR =
     "The input file from which voxelio reads. If none is specified, stdin is used instead.";
-constexpr const char *OUTPUT_DESCR =
-    "The output file which is written. If none is specified, stdout is used instead.";
-constexpr const char* INPUT_FORMAT_DESCR = "The input format. Must be one of "
+constexpr const char *OUTPUT_DESCR = "The output file which is written. If none is specified, stdout is used instead.";
+constexpr const char *INPUT_FORMAT_DESCR = "The input format. Must be one of "
                                            "binvox, cub, qb, qef, vl32, vox";
-constexpr const char* OUTPUT_FORMAT_DESCR = "The output format. Must be one of flvc, qef, vl32";
-constexpr const char* LEVEL_DESCR = "The zlib compression level. Must be in range [0, 9]. Zero is no compression.";
+constexpr const char *OUTPUT_FORMAT_DESCR = "The output format. Must be one of flvc, qef, vl32";
+constexpr const char *LEVEL_DESCR = "The zlib compression level. Must be in range [0, 9]. Zero is no compression.";
 
 }  // namespace
 
-static const std::map<std::string, FileType> FORMAT_MAP {
+static const std::map<std::string, FileType> FORMAT_MAP{
     {"binvox", FileType::BINVOX},
     {"cub", FileType::CUBEWORLD_CUB},
     {"flvc", FileType::FLVC},
     {"qb", FileType::QUBICLE_BINARY},
-     {"qef", FileType::QUBICLE_EXCHANGE},
-     {"vl32", FileType::VL32},
-     {"vox", FileType::MAGICA_VOX},
+    {"qef", FileType::QUBICLE_EXCHANGE},
+    {"vl32", FileType::VL32},
+    {"vox", FileType::MAGICA_VOX},
 };
 
-AbstractReader* makeReader(InputStream &stream, FileType type)
+AbstractReader *makeReader(InputStream &stream, FileType type)
 {
     switch (type) {
     case FileType::BINVOX: return new binvox::Reader{stream};
@@ -62,7 +61,7 @@ AbstractReader* makeReader(InputStream &stream, FileType type)
     }
 }
 
-AbstractListWriter* makeWriter(OutputStream &stream, FileType type)
+AbstractListWriter *makeWriter(OutputStream &stream, FileType type)
 {
     switch (type) {
     case FileType::QUBICLE_EXCHANGE: return new qef::Writer{stream};
@@ -122,7 +121,7 @@ static const AttributeDef DEF_COLOR = AttributeDef{"color", AttributeType::UINT_
             Voxel32 &voxel = VOXEL_BUFFER_32[voxelIndex];
 
             decodeStream.readNative<3, i32>(voxel.pos.data());
-            decodeStream.read(reinterpret_cast<u8*>(&voxel.argb), DEF_COLOR.cardinality);
+            decodeStream.read(reinterpret_cast<u8 *>(&voxel.argb), DEF_COLOR.cardinality);
         }
     }
     if (decoder.failed()) {
@@ -171,7 +170,7 @@ static const AttributeDef DEF_COLOR = AttributeDef{"color", AttributeType::UINT_
             Voxel64 &voxel = VOXEL_BUFFER_64[i];
             Vec3i32 pos32 = voxel.pos.cast<i32>();
             u32 *argb = &voxel.argb;
-            u8 *argbBytes = reinterpret_cast<u8*>(argb);
+            u8 *argbBytes = reinterpret_cast<u8 *>(argb);
 
             attribStream.writeNative<3, i32>(pos32.data());
             attribStream.write(argbBytes, 4);
@@ -197,8 +196,8 @@ static const AttributeDef DEF_COLOR = AttributeDef{"color", AttributeType::UINT_
     return 0;
 }
 
-[[nodiscard]] int convert(FileInputStream &in, FileType inFormat, FileOutputStream &out, FileType outFormat,
-                          unsigned level)
+[[nodiscard]] int convert(
+    FileInputStream &in, FileType inFormat, FileOutputStream &out, FileType outFormat, unsigned level)
 {
     if (inFormat == FileType::FLVC) {
         if (outFormat == FileType::FLVC) {
@@ -240,8 +239,7 @@ std::optional<FileType> parseFormat(args::ValueFlag<std::string> &flag)
 
     args::Group group_output(parser, "Input file and input format:", args::Group::Validators::DontCare);
     args::ValueFlag<std::string> arg_outputFile(group_output, "file", OUTPUT_DESCR, {'o', "output"});
-    args::ValueFlag<std::string> arg_outputFormat(
-        group_output, "format", OUTPUT_FORMAT_DESCR, {'O', "output-format"});
+    args::ValueFlag<std::string> arg_outputFormat(group_output, "format", OUTPUT_FORMAT_DESCR, {'O', "output-format"});
 
     parser.ParseCLI(argc, argv);
 
@@ -323,7 +321,8 @@ std::optional<FileType> parseFormat(args::ValueFlag<std::string> &flag)
         VXIO_ASSERT(arg_outputFile.Matched());
         outFormat = detectFileType(arg_outputFile.Get());
         if (not outFormat.has_value()) {
-            VXIO_LOG(WARNING, "Could not detect output format of \"" + arg_outputFormat.Get() + "\", defaulting to FLVC");
+            VXIO_LOG(WARNING,
+                     "Could not detect output format of \"" + arg_outputFormat.Get() + "\", defaulting to FLVC");
             outFormat = FileType::FLVC;
         }
     }
@@ -345,7 +344,7 @@ std::optional<FileType> parseFormat(args::ValueFlag<std::string> &flag)
     return convert(*in, *inFormat, *out, *outFormat, level);
 }
 
-} // namespace flvc
+}  // namespace flvc
 
 int main(int argc, const char **argv)
 {
