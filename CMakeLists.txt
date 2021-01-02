@@ -28,8 +28,7 @@ set(SOURCES
     flvcconfig.hpp
     flvcconst.hpp
     permutation.hpp
-    svo.hpp
-    svo_nodes.hpp)
+    svo.hpp)
 
 add_executable(flvc "${SOURCES}")
 target_include_directories(flvc PUBLIC voxelio/src/)
