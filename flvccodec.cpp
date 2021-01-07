@@ -19,6 +19,14 @@ using namespace voxelio;
 
 namespace {
 
+/**
+ * @brief Performs the actual delta-coding.
+ * @param def the attribute definition
+ * @param parent a pointer to the attribute data of the parent
+ * @param children an array of pointers to the attribute data of the children
+ * @param childCount the number of children
+ * @param offset a constant offset for both parent and children; useful for vector attributes (cardinality >= 2)
+ */
 template <typename Int>
 void doEncode(const AttributeDef &def, u8 *parent, u8 *children[], const usize childCount, const usize offset)
 {
@@ -38,11 +46,19 @@ void doEncode(const AttributeDef &def, u8 *parent, u8 *children[], const usize c
         u8 *childData = children[child] + offset;
         Int value = decodeAttrib<Int>(childData, def.type);
         VXIO_DEBUG_ASSERT_GE(value, min);
-        Int delta = value - min;
+        Int delta = value - min * (OPTIMIZATION_LEVEL > OptimizationLevel::NO_DELTA_CODING);
         encodeAttrib<Int>(delta, childData, def.type);
     }
 }
 
+/**
+ * @brief Performs the actual delta-decoding.
+ * @param def the attribute definition
+ * @param parent a pointer to the attribute data of the parent
+ * @param children an array of pointers to the attribute data of the children
+ * @param childCount the number of children
+ * @param offset a constant offset for both parent and children; useful for vector attributes (cardinality >= 2)
+ */
 template <typename Int>
 void doDecode(const AttributeDef &def, u8 *parent, u8 *children[], const usize childCount, const usize offset)
 {
@@ -53,7 +69,7 @@ void doDecode(const AttributeDef &def, u8 *parent, u8 *children[], const usize c
     for (usize child = 0; child < childCount; ++child) {
         u8 *childData = children[child] + offset;
         Int delta = decodeAttrib<Int>(childData, def.type);
-        Int value = min + delta;
+        Int value = min * (OPTIMIZATION_LEVEL > OptimizationLevel::NO_DELTA_CODING) + delta;
         encodeAttrib(value, childData, def.type);
     }
 }
@@ -197,12 +213,12 @@ void CodecBase::genPermutations(const usize nodeCount) noexcept
 
     const usize index = nodeCount - 1;
 
-    if (nodeCount == 1) {
-        dileavePermsWithInternal[index] = Permutation::identity(encodedAttribSize);
-        dileavePermsNoInternal[index] = Permutation::identity(encodedAttribSize - 1);
+    if (OPTIMIZATION_LEVEL <= OptimizationLevel::NO_ATTRIBUTE_DILEAVING || nodeCount == 1) {
+        dileavePermsWithInternal[index] = Permutation::identity(encodedAttribSize * nodeCount);
+        dileavePermsNoInternal[index] = Permutation::identity((encodedAttribSize - 1) * nodeCount);
 
-        ileavePermsWithInternal[index] = Permutation::identity(encodedAttribSize);
-        ileavePermsNoInternal[index] = Permutation::identity(encodedAttribSize - 1);
+        ileavePermsWithInternal[index] = dileavePermsWithInternal[index];
+        ileavePermsNoInternal[index] = dileavePermsNoInternal[index];
     }
     else {
         flvc::Permutation perm = genDeinterleavingPermutation(nodeCount);
@@ -524,7 +540,9 @@ bool Encoder::writeHeader()
     FLVC_ANNOTATE("padding");
     stream.write(pad, 5);
 
-    VXIO_DEBUG_ASSERT_EQ(stream.position(), 40);
+    if constexpr (not ANNOTATE_BINARY) {
+        VXIO_DEBUG_ASSERT_EQ(stream.position(), 40);
+    }
 
     FLVC_ANNOTATE("definitions_size");
     stream.writeLittle(static_cast<u16>(attribDefs.size()));
@@ -566,7 +584,7 @@ bool Encoder::writeSvo()
         writeSuccess &= writeSuccess && writeNode(*node, type);
     });
 
-    if constexpr (ANNOTATE_BINARY) {
+    if constexpr (OPTIMIZATION_LEVEL <= OptimizationLevel::NO_COMPRESSION) {
         return stream.good();
     }
     else {
@@ -631,7 +649,9 @@ bool Encoder::writeNode(node_type &node, SvoNodeType type)
 
         for (usize elem = 0; elem < attrDef.cardinality; ++elem) {
             u8 *inout = begin + ileaveOffset;
-            ileaveAttrib(inout, inout, childCount, attrDef.type);
+            if constexpr (OPTIMIZATION_LEVEL > OptimizationLevel::NO_BIT_INTERLEAVING) {
+                ileaveAttrib(inout, inout, childCount, attrDef.type);
+            }
             ileaveOffset += childCount * attrDef.elementSize();
         }
     }
@@ -639,7 +659,7 @@ bool Encoder::writeNode(node_type &node, SvoNodeType type)
 
     // 3. WRITE TO STREAM / INFLATOR
 
-    if constexpr (ANNOTATE_BINARY) {
+    if constexpr (OPTIMIZATION_LEVEL <= OptimizationLevel::NO_COMPRESSION) {
         const NodeType type =
             atLeaf ? NodeType::VOXEL : complete ? NodeType::COMPLETE : nodeTypeOf(downcast<branch_type &>(node).type());
         const char annotationChar = annotationCharOf(type);
@@ -667,7 +687,7 @@ bool Encoder::writeAttribData(usize attribIndex, NodeType type)
     const u8 *begin = attribData.data() + attribIndex + complete;
     const usize dataLength = encodedAttribSize - isComplete(type);
 
-    if constexpr (ANNOTATE_BINARY) {
+    if constexpr (OPTIMIZATION_LEVEL <= OptimizationLevel::NO_COMPRESSION) {
         FLVC_ANNOTATE(std::string(1, annotationCharOf(type)));
         stream.write(begin, dataLength);
         return stream.good();
@@ -975,7 +995,9 @@ void Decoder::deoptimizeFrame_bitDeinterleave(Frame &frame, const u8 childCount,
 
         for (usize elem = 0; elem < attrDef.cardinality; ++elem) {
             u8 *inout = begin + ileaveOffset;
-            dileaveAttrib(inout, inout, childCount, attrDef.type);
+            if constexpr (OPTIMIZATION_LEVEL > OptimizationLevel::NO_BIT_INTERLEAVING) {
+                dileaveAttrib(inout, inout, childCount, attrDef.type);
+            }
             ileaveOffset += childCount * attrDef.elementSize();
         }
     }

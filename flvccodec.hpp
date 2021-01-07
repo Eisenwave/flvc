@@ -267,6 +267,7 @@ private:
     flvc::Permutation genDeinterleavingPermutation(size_t nodeCount) noexcept;
 };
 
+/// Struct representing the (non-constant) parsed fields of the FLVC header.
 struct Header {
     /**
      * @brief The global offset of all voxels stored in the file.
