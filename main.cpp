@@ -36,6 +36,8 @@ constexpr const char *INPUT_FORMAT_DESCR = "The input format. Must be one of "
 constexpr const char *OUTPUT_FORMAT_DESCR = "The output format. Must be one of flvc, qef, vl32";
 constexpr const char *LEVEL_DESCR = "The zlib compression level. Must be in range [0, 9]. Zero is no compression.";
 
+constexpr LogLevel LOG_LEVEL = LogLevel::INFO;
+
 }  // namespace
 
 static const std::map<std::string, FileType> FORMAT_MAP{
@@ -94,6 +96,7 @@ static const AttributeDef DEF_COLOR = AttributeDef{"color", AttributeType::UINT_
 
     ByteArrayInputStream decodeStream{DECODE_BUFFER, sizeof(DECODE_BUFFER)};
 
+    usize voxelCount = 0;
     usize voxelIndex = 0;
 
     VXIO_LOG(INFO, "Decoding FLVC content ...");
@@ -107,6 +110,7 @@ static const AttributeDef DEF_COLOR = AttributeDef{"color", AttributeType::UINT_
         }
         decodeStream.clearErrors();
         decodeStream.seekAbsolute(0);
+        voxelCount += voxelsRead;
 
         for (usize i = 0; i < voxelsRead; ++i, ++voxelIndex) {
             if (voxelIndex == VOXEL_BUFFER_32_SIZE) {
@@ -121,7 +125,7 @@ static const AttributeDef DEF_COLOR = AttributeDef{"color", AttributeType::UINT_
             Voxel32 &voxel = VOXEL_BUFFER_32[voxelIndex];
 
             decodeStream.readNative<3, i32>(voxel.pos.data());
-            decodeStream.read(reinterpret_cast<u8 *>(&voxel.argb), DEF_COLOR.cardinality);
+            voxel.argb = decodeStream.readBig<u32>();
         }
     }
     if (decoder.failed()) {
@@ -130,6 +134,7 @@ static const AttributeDef DEF_COLOR = AttributeDef{"color", AttributeType::UINT_
     }
 
     VXIO_LOG(INFO, "Flushing remaining " + stringify(voxelIndex) + " voxels ...");
+    VXIO_LOG(INFO, "All voxels written! (" + stringifyLargeInt(voxelCount) + " voxels)");
 
     // flush any remaining voxels
     voxelio::ResultCode writeResult = writer->write(VOXEL_BUFFER_32, voxelIndex);
@@ -158,22 +163,22 @@ static const AttributeDef DEF_COLOR = AttributeDef{"color", AttributeType::UINT_
 
     VXIO_LOG(INFO, "Reading file and passing voxels to encoder ...");
 
+    usize voxelCount = 0;
     do {
         result = reader->read(VOXEL_BUFFER_64, 8192);
         if (result.isBad()) {
             VXIO_LOG(ERROR, "Read error: " + informativeNameOf(result.type));
             return 1;
         }
+        voxelCount += result.voxelsRead;
 
         attribStream.clear();
         for (usize i = 0; i < result.voxelsRead; ++i) {
             Voxel64 &voxel = VOXEL_BUFFER_64[i];
             Vec3i32 pos32 = voxel.pos.cast<i32>();
-            u32 *argb = &voxel.argb;
-            u8 *argbBytes = reinterpret_cast<u8 *>(argb);
 
             attribStream.writeNative<3, i32>(pos32.data());
-            attribStream.write(argbBytes, 4);
+            attribStream.writeBig<u32>(voxel.argb);
         }
         flvc::ResultCode insertResult = encoder.insert(attribStream.data(), result.voxelsRead);
         if (insertResult != flvc::ResultCode::OK) {
@@ -185,6 +190,7 @@ static const AttributeDef DEF_COLOR = AttributeDef{"color", AttributeType::UINT_
 
     reader.reset();
 
+    VXIO_LOG(INFO, "All voxels read! (" + stringifyLargeInt(voxelCount) + " voxels)");
     VXIO_LOG(INFO, "Optimizing SVO and writing ...");
     ResultCode writeResult = encoder.write();
     if (writeResult != flvc::ResultCode::OK) {
@@ -227,6 +233,8 @@ std::optional<FileType> parseFormat(args::ValueFlag<std::string> &flag)
 
 [[nodiscard]] int main_impl(int argc, const char **argv)
 {
+    voxelio::logLevel = LOG_LEVEL;
+
     args::ArgumentParser parser(HEADER, FOOTER);
 
     args::Group group_general(parser, "General Options:");
