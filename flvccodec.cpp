@@ -4,10 +4,10 @@
 #include "flvcconfig.hpp"
 #include "flvcconst.hpp"
 
-#include "voxelio/src/deflate.hpp"
-#include "voxelio/src/log.hpp"
-#include "voxelio/src/stream.hpp"
-#include "voxelio/src/wileave.hpp"
+#include "voxelio/deflate.hpp"
+#include "voxelio/log.hpp"
+#include "voxelio/stream.hpp"
+#include "voxelio/wileave.hpp"
 
 namespace flvc {
 

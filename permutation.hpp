@@ -1,7 +1,7 @@
 #ifndef FLVC_PERMUTATION_HPP
 #define FLVC_PERMUTATION_HPP
 
-#include "voxelio/src/assert.hpp"
+#include "voxelio/assert.hpp"
 
 #include <algorithm>
 #include <vector>

@@ -6,8 +6,8 @@
  * Defines constants and enumerations such as AttributeType and ResultCode which are used by FLVC.
  */
 
-#include "voxelio/src/assert.hpp"
-#include "voxelio/src/intlog.hpp"
+#include "voxelio/assert.hpp"
+#include "voxelio/intlog.hpp"
 
 #include <array>
 #include <cstdint>

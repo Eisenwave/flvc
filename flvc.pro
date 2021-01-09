@@ -13,9 +13,11 @@ CONFIG(debug, debug|release) {
     DEFINES += VXIO_DEBUG
 }
 
-LIBS += -lstdc++fs
+LIBS += -Lvoxelio \
+        -lvoxelio \
+        -lstdc++fs
 
-INCLUDEPATH += voxelio/src
+INCLUDEPATH += voxelio/include
 
 HEADERS += flvattrib.hpp \
            flvccodec.hpp \

@@ -5,10 +5,10 @@
 #include "flvcconst.hpp"
 #include "permutation.hpp"
 
-#include "voxelio/src/deflate.hpp"
-#include "voxelio/src/endian.hpp"
-#include "voxelio/src/streamfwd.hpp"
-#include "voxelio/src/types.hpp"
+#include "voxelio/deflate.hpp"
+#include "voxelio/endian.hpp"
+#include "voxelio/streamfwd.hpp"
+#include "voxelio/types.hpp"
 
 #include <type_traits>
 #include <vector>

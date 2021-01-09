@@ -9,9 +9,9 @@
 
 #include "flvcconst.hpp"
 
-#include "voxelio/src/endian.hpp"
-#include "voxelio/src/primitives.hpp"
-#include "voxelio/src/wileave.hpp"
+#include "voxelio/endian.hpp"
+#include "voxelio/primitives.hpp"
+#include "voxelio/wileave.hpp"
 
 namespace flvc {
 

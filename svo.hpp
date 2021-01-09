@@ -1,11 +1,11 @@
 #ifndef FLVC_SVO_HPP
 #define FLVC_SVO_HPP
 
-#include "voxelio/src/assert.hpp"
-#include "voxelio/src/bits.hpp"
-#include "voxelio/src/ileave.hpp"
-#include "voxelio/src/stringify.hpp"
-#include "voxelio/src/vec.hpp"
+#include "voxelio/assert.hpp"
+#include "voxelio/bits.hpp"
+#include "voxelio/ileave.hpp"
+#include "voxelio/stringify.hpp"
+#include "voxelio/vec.hpp"
 
 #include <array>
 #include <memory>

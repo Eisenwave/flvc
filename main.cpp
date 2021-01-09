@@ -1,20 +1,20 @@
 #include "args.hpp"
 
-#include "bits.hpp"
-#include "filetype.hpp"
-#include "log.hpp"
-#include "stream.hpp"
-#include "stringmanip.hpp"
-#include "voxelio.hpp"
-
 #include "flvccodec.hpp"
 
-#include "format/binvox.hpp"
-#include "format/cubeworld.hpp"
-#include "format/qb.hpp"
-#include "format/qef.hpp"
-#include "format/vl32.hpp"
-#include "format/vox.hpp"
+#include "voxelio/bits.hpp"
+#include "voxelio/filetype.hpp"
+#include "voxelio/log.hpp"
+#include "voxelio/stream.hpp"
+#include "voxelio/stringmanip.hpp"
+#include "voxelio/voxelio.hpp"
+
+#include "voxelio/format/binvox.hpp"
+#include "voxelio/format/cubeworld.hpp"
+#include "voxelio/format/qb.hpp"
+#include "voxelio/format/qef.hpp"
+#include "voxelio/format/vl32.hpp"
+#include "voxelio/format/vox.hpp"
 
 #include <iostream>
 #include <map>

@@ -31,5 +31,5 @@ set(SOURCES
     svo.hpp)
 
 add_executable(flvc "${SOURCES}")
-target_include_directories(flvc PUBLIC voxelio/src/)
+target_include_directories(flvc PUBLIC voxelio/include)
 target_link_libraries(flvc voxelio)
