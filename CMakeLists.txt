@@ -21,15 +21,10 @@ add_subdirectory(voxelio)
 include_directories(voxelio/src)
 
 set(SOURCES
-    main.cpp
-    flvcattrib.hpp
-    flvccodec.hpp
-    flvccodec.cpp
-    flvcconfig.hpp
-    flvcconst.hpp
-    permutation.hpp
-    svo.hpp)
+    src/main.cpp
+    src/flvccodec.cpp)
 
 add_executable(flvc "${SOURCES}")
+target_include_directories(flvc PUBLIC include)
 target_include_directories(flvc PUBLIC voxelio/include)
 target_link_libraries(flvc voxelio)

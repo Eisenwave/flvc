@@ -17,14 +17,15 @@ LIBS += -Lvoxelio \
         -lvoxelio \
         -lstdc++fs
 
-INCLUDEPATH += voxelio/include
+INCLUDEPATH += include voxelio/include
 
-HEADERS += flvattrib.hpp \
-           flvccodec.hpp \
-           flvcconfig.hpp \
-           flvcconst.hpp \
-           permutation.hpp \
-           svo.hpp
+HEADERS += include/flvc/flvattrib.hpp \
+           include/flvc/flvccodec.hpp \
+           include/flvc/flvcconfig.hpp \
+           include/flvc/flvcconst.hpp \
+           include/flvc/permutation.hpp \
+           include/flvc/svo.hpp \
+           include/flvc/3rd_party/args.hpp
            
-SOURCES += flvccodec.cpp \
-           main.cpp
+SOURCES += src/flvccodec.cpp \
+           src/main.cpp

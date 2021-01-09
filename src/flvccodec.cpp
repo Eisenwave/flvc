@@ -1,8 +1,8 @@
-#include "flvccodec.hpp"
+#include "flvc/flvccodec.hpp"
 
-#include "flvcattrib.hpp"
-#include "flvcconfig.hpp"
-#include "flvcconst.hpp"
+#include "flvc/flvcattrib.hpp"
+#include "flvc/flvcconfig.hpp"
+#include "flvc/flvcconst.hpp"
 
 #include "voxelio/deflate.hpp"
 #include "voxelio/log.hpp"

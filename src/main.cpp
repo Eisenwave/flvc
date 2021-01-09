@@ -1,6 +1,6 @@
-#include "args.hpp"
+#include "flvc/3rd_party/args.hpp"
 
-#include "flvccodec.hpp"
+#include "flvc/flvccodec.hpp"
 
 #include "voxelio/bits.hpp"
 #include "voxelio/filetype.hpp"
