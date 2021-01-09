@@ -203,43 +203,56 @@ template <typename T>
 {
 #define CASE(E) \
     case AttributeType::E: return detail::decodeAttrib_impl<T, AttributeType::E>(data)
-    switch (type) {
-        CASE(BOOL);
-        CASE(INT_8);
-        CASE(INT_16);
-        CASE(INT_32);
-        CASE(INT_64);
+    if constexpr (std::is_unsigned_v<T>) {
+        switch (type) {
         CASE(UINT_8);
         CASE(UINT_16);
         CASE(UINT_32);
         CASE(UINT_64);
-        CASE(FLOAT_32);
-        CASE(FLOAT_64);
+        default: VXIO_DEBUG_ASSERT_UNREACHABLE();
+        }
+    }
+    else {
+        switch (type) {
+            CASE(BOOL);
+            CASE(INT_8);
+            CASE(INT_16);
+            CASE(INT_32);
+            CASE(INT_64);
+            CASE(FLOAT_32);
+            CASE(FLOAT_64);
+            default: VXIO_DEBUG_ASSERT_UNREACHABLE();
+        }
     }
 #undef CASE
-    VXIO_DEBUG_ASSERT_UNREACHABLE();
 }
 
 template <typename T>
 constexpr void encodeAttrib(T value, u8 out[], AttributeType type)
 {
-#define CASE(E) \
-    case AttributeType::E: return detail::encodeAttrib_impl<T, AttributeType::E>(value, out);
-    switch (type) {
-        CASE(BOOL);
-        CASE(INT_8);
-        CASE(INT_16);
-        CASE(INT_32);
-        CASE(INT_64);
+#define CASE(E) case AttributeType::E: return detail::encodeAttrib_impl<T, AttributeType::E>(value, out);
+    if constexpr (std::is_unsigned_v<T>) {
+        switch (type) {
         CASE(UINT_8);
         CASE(UINT_16);
         CASE(UINT_32);
         CASE(UINT_64);
-        CASE(FLOAT_32);
-        CASE(FLOAT_64);
+        default: VXIO_DEBUG_ASSERT_UNREACHABLE();
+        }
+    }
+    else {
+        switch (type) {
+            CASE(BOOL);
+            CASE(INT_8);
+            CASE(INT_16);
+            CASE(INT_32);
+            CASE(INT_64);
+            CASE(FLOAT_32);
+            CASE(FLOAT_64);
+            default: VXIO_DEBUG_ASSERT_UNREACHABLE();
+        }
     }
 #undef CASE
-    VXIO_DEBUG_ASSERT_UNREACHABLE();
 }
 
 constexpr void ileaveAttrib(const u8 in[], u8 out[], usize count, AttributeType type)
