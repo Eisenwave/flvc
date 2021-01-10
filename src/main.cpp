@@ -154,12 +154,8 @@ static const AttributeDef DEF_COLOR = AttributeDef{"color", AttributeType::UINT_
     ByteArrayOutputStream attribStream;
 
     flvc::Encoder encoder{out, {level}};
-    flvc::ResultCode code = encoder.defineAttribute(DEF_POSITION);
-    code = encoder.defineAttribute(DEF_COLOR);
-    if (code != flvc::ResultCode::OK) {
-        VXIO_LOG(ERROR, "Definition error: " + std::string(nameOf(code)));
-        return 1;
-    }
+    encoder.defineAttribute(DEF_POSITION);
+    encoder.defineAttribute(DEF_COLOR);
 
     VXIO_LOG(INFO, "Reading file and passing voxels to encoder ...");
 

@@ -192,7 +192,7 @@ public:
      * @param def the attribute definition
      * @return the result code
      */
-    [[nodiscard]] ResultCode defineAttribute(AttributeDef def) noexcept;
+    ResultCode defineAttribute(AttributeDef def) noexcept;
 
     /**
      * @brief Returns the current definition of the position attribute.
