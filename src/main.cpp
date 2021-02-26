@@ -229,7 +229,7 @@ std::optional<FileType> parseFormat(args::ValueFlag<std::string> &flag)
 
 [[nodiscard]] int main_impl(int argc, const char **argv)
 {
-    voxelio::logLevel = LOG_LEVEL;
+    voxelio::setLogLevel(LOG_LEVEL);
 
     args::ArgumentParser parser(HEADER, FOOTER);
 
