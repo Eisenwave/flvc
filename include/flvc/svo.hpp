@@ -362,7 +362,7 @@ private:
 
 public:
     SparseVoxelOctree() = default;
-    SparseVoxelOctree(const SparseVoxelOctree &copyOf) : root{copyOf.root->clone()} {}
+    SparseVoxelOctree(const SparseVoxelOctree &copyOf) = delete;
     SparseVoxelOctree(SparseVoxelOctree &&) = default;
 
     value_type *getIfExists(const Vec3i32 &pos);
