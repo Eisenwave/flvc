@@ -99,7 +99,7 @@ constexpr T decodeAttrib_impl(const u8 data[])
 
     itype result = voxelio::decodeNative<itype>(data);
 
-    if constexpr (isInteger(type)) {
+    if constexpr (isInteger(type) && voxelio::build::DEBUG) {
         constexpr T maxRepresentable = std::numeric_limits<T>::max();
         VXIO_DEBUG_ASSERT_LE(result, maxRepresentable);
     }
@@ -115,7 +115,7 @@ constexpr void encodeAttrib_impl(T value, u8 out[])
     // signed/unsigned mismatch
     VXIO_DEBUG_ASSERT_EQ(std::is_signed_v<T>, isSigned(type));
 
-    if constexpr (isInteger(type)) {
+    if constexpr (isInteger(type) && voxelio::build::DEBUG) {
         constexpr itype maxRepresentable = std::numeric_limits<itype>::max();
         VXIO_DEBUG_ASSERT_LE(value, maxRepresentable);
     }
