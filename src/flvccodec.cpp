@@ -595,7 +595,7 @@ bool Encoder::writeSvo()
 
 bool Encoder::writeNode(node_type &node, SvoNodeType type)
 {
-    const usize firstIndex = node.firstIndex();
+    VXIO_IF_DEBUG(const usize firstIndex = node.firstIndex());
     VXIO_DEBUG_ASSERT_LT(firstIndex, 8);
 
     const bool atLeaf = type == SvoNodeType::LEAF;
